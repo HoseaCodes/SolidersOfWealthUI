@@ -7,10 +7,12 @@ yarn-error.log
 
 .env
 .env.local
-
+.firebase
 # Editor config
 .idea
 .vscode
 
 # OS
 .DS_Store
+
+solider-of-wealth-firebase-adminsdk-fbsvc-22cd12bb3f.json
