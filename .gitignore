@@ -1,0 +1,15 @@
+node_modules
+build
+firebase-debug.log
+firebase.json
+yarn.lock
+yarn-error.log
+
+.env
+
+# Editor config
+.idea
+.vscode
+
+# OS
+.DS_Store
