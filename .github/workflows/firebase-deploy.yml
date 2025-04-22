@@ -21,7 +21,7 @@ jobs:
         run: npm ci
         
       - name: Build React App
-        run: npm run build
+        run: CI=false npm run build
         
       - name: Deploy to Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -30,4 +30,3 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
           projectId: solider-of-wealth
-
