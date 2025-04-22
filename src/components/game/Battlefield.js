@@ -81,12 +81,12 @@ export default function Battlefield() {
 
   const handleAttack = () => {
     // TODO: Implement attack logic
-    console.log(\`Attacking player \${selectedPlayer?.id}\`);
+    console.log('Attacking player ' + selectedPlayer?.id);
   };
 
   const handleSpy = () => {
     // TODO: Implement spy logic
-    console.log(\`Spying on player \${selectedPlayer?.id}\`);
+    console.log('Spying on player ' + selectedPlayer?.id);
   };
 
   if (loading) return <div>Loading...</div>;

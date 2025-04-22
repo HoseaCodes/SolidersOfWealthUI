@@ -1,12 +1,14 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { auth, db } from '../firebase';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AuthContext = createContext();
 
@@ -23,17 +25,33 @@ export function AuthProvider({ children }) {
     // Initialize player data
     await setDoc(doc(db, 'players', result.user.uid), {
       soldiers: 100,
-      actionsRemaining: 3,
-      currentWeek: 1,
-      defense: 0,
+      wealth: 1000,
       investments: {},
       createdAt: new Date().toISOString()
     });
     return result;
   }
 
-  function login(email, password) {
+  async function login(email, password) {
     return signInWithEmailAndPassword(auth, email, password);
+  }
+
+  async function loginWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    
+    // Check if this is a new user
+    if (result._tokenResponse?.isNewUser) {
+      // Initialize player data for new Google users
+      await setDoc(doc(db, 'players', result.user.uid), {
+        soldiers: 100,
+        wealth: 1000,
+        investments: {},
+        createdAt: new Date().toISOString()
+      });
+    }
+    
+    return result;
   }
 
   function logout() {
@@ -41,13 +59,8 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const playerDoc = await getDoc(doc(db, 'players', user.uid));
-        setCurrentUser({ ...user, playerData: playerDoc.data() });
-      } else {
-        setCurrentUser(null);
-      }
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      setCurrentUser(user);
       setLoading(false);
     });
 
@@ -58,6 +71,7 @@ export function AuthProvider({ children }) {
     currentUser,
     signup,
     login,
+    loginWithGoogle,
     logout
   };
 

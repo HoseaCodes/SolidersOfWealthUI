@@ -91,7 +91,7 @@ export default function MarketDashboard() {
 
   const handleInvestment = () => {
     // TODO: Implement investment logic
-    console.log(\`Investing \${investmentAmount} soldiers in \${selectedMarket?.name}\`);
+    console.log('Investing ' + investmentAmount + ' soldiers in ' + selectedMarket?.name);
   };
 
   return (

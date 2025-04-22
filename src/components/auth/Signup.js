@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import styled from 'styled-components';
 import { FcGoogle } from 'react-icons/fc';
 
-const LoginContainer = styled.div`
+const SignupContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -71,7 +71,7 @@ const Error = styled.div`
   text-align: center;
 `;
 
-const SignupLink = styled(Link)`
+const LoginLink = styled(Link)`
   display: block;
   text-align: center;
   margin-top: 1rem;
@@ -83,35 +83,40 @@ const SignupLink = styled(Link)`
   }
 `;
 
-export default function Login() {
+export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
-    
+
+    if (password !== confirmPassword) {
+      return setError('Passwords do not match');
+    }
+
     try {
       setError('');
       setLoading(true);
-      await login(email, password)
+      await signup(email, password)
         .then(() => {
           navigate('/dashboard');
         });
     } catch (error) {
-      setError('Failed to sign in. Please check your credentials.');
+      setError('Failed to create an account. ' + error.message);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <LoginContainer>
+    <SignupContainer>
       <Form onSubmit={handleSubmit}>
-        <Title>SOLDIERS OF WEALTH</Title>
+        <Title>JOIN THE BATTLE</Title>
         {error && <Error>{error}</Error>}
         
         <Input
@@ -130,8 +135,16 @@ export default function Login() {
           required
         />
         
+        <Input
+          type="password"
+          placeholder="Confirm Password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
+        
         <Button type="submit" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? 'Creating Account...' : 'Create Account'}
         </Button>
 
         <div className="my-4 flex items-center justify-between">
@@ -154,14 +167,14 @@ export default function Login() {
         >
           <div className="flex items-center justify-center">
             <FcGoogle className="w-6 h-6" />
-            <span className="ml-2">Sign in with Google</span>
+            <span className="ml-2">Sign up with Google</span>
           </div>
         </Button>
         
-        <SignupLink to="/signup">
-          New commander? Create an account
-        </SignupLink>
+        <LoginLink to="/login">
+          Already have an account? Sign in
+        </LoginLink>
       </Form>
-    </LoginContainer>
+    </SignupContainer>
   );
 }
