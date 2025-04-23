@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { getFirestore, collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { FaBook, FaGraduationCap, FaComments, FaPlay, FaClock, FaCheckCircle, FaHourglassHalf, FaLock } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -11,8 +10,12 @@ import Rulebook from '../game/Rulebook';
 import Training from '../game/Training';
 import Forum from '../game/Forum';
 
-export default function Dashboard() {
+const Dashboard = () => {
+  const [upcomingGames, setUpcomingGames] = useState([]);
+  const [activeGames, setActiveGames] = useState([]);
+  const [pastGames, setPastGames] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [playerStats, setPlayerStats] = useState(null);
   const [showRulebook, setShowRulebook] = useState(false);
   const [showTraining, setShowTraining] = useState(false);
@@ -21,80 +24,79 @@ export default function Dashboard() {
   const [nextBattle, setNextBattle] = useState(null);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const db = getFirestore();
 
-  const upcomingGames = [
-    {
-      id: "season1",
-      name: "SEASON 1: MARKET WARFARE",
-      startDate: "2025-04-23T00:00:00-05:00",
-      endDate: "2025-05-23T00:00:00-05:00",
-      spotsLeft: 20,
-      commandersEnlisted: 24,
-      difficulty: "Beginner",
-      difficultyLevel: 2,
-      entryFee: 100,
-      reward: 1000
-    },
-    {
-      id: "season2",
-      name: "SEASON 2: CRYPTO WARS",
-      startDate: "2025-04-21T00:00:00-05:00",
-      endDate: "2025-05-21T00:00:00-05:00",
-      spotsLeft: 8,
-      commandersEnlisted: 12,
-      difficulty: "Advanced",
-      difficultyLevel: 4,
-      entryFee: 200,
-      reward: 2000
-    },
-    {
-      id: "elitesquad",
-      name: "ELITE SQUAD: TACTICAL FINANCE",
-      startDate: "2025-04-20T00:00:00-05:00",
-      endDate: "2025-05-20T00:00:00-05:00",
-      spotsLeft: 5,
-      commandersEnlisted: 15,
-      difficulty: "Expert",
-      difficultyLevel: 5,
-      entryFee: 500,
-      reward: 5000
-    }
-  ];
+  useEffect(() => {
+    loadGames();
+  }, []);
 
-  const pastSeasons = [
-    {
-      id: 1,
-      name: "SEASON 1: FIRST STRIKE",
-      date: "March 2025",
-      players: 44,
-      winner: "Charles Nolen II",
-      image: "/images/sow_m1_w1_recap.jpeg"
-    },
-    {
-      id: 2,
-      name: "PRIVATE: EXECUTIVE LEAGUE",
-      date: "February 2025",
-      players: 10,
-      winner: "Grace Anderson",
-      image: "/images/general_patton.jpeg"
-    },
-    {
-      id: 3,
-      name: "BETA: MARKET INCURSION",
-      date: "January 2025",
-      players: 32,
-      winner: "Romado S.",
-      image: "/images/sow_m1_w2_recap.jpeg"
-    },
-    {
-      id: 4,
-      name: "ALPHA: TESTING GROUNDS",
-      date: "December 2024",
-      players: 16,
-      winner: "Eric-Allen Frazier",
-      image: "/images/general_patton_promo.jpeg"
+  const loadGames = async () => {
+    try {
+      // Get upcoming games
+      const upcomingQuery = query(
+        collection(db, 'games'),
+        where('status', '==', 'upcoming')
+      );
+      const upcomingSnapshot = await getDocs(upcomingQuery);
+      const upcomingGames = upcomingSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUpcomingGames(upcomingGames);
+
+      // Get active games where the current user is a player
+      const activeQuery = query(
+        collection(db, 'games'),
+        where('status', '==', 'active'),
+        where('players', 'array-contains', currentUser.uid)
+      );
+      const activeSnapshot = await getDocs(activeQuery);
+      const activeGames = activeSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setActiveGames(activeGames);
+
+      // Get past games
+      const pastGamesSnapshot = await getDocs(collection(db, 'pastGames'));
+      const pastGamesData = pastGamesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPastGames(pastGamesData);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading games:', error);
+      setError('Failed to load games');
+      setLoading(false);
     }
-  ];
+  };
+
+  const handleEnlist = async (gameId) => {
+    try {
+      const gameRef = doc(db, 'games', gameId);
+      const game = upcomingGames.find(g => g.id === gameId);
+      
+      if (game.spotsLeft <= 0) {
+        setError('No spots left in this game');
+        return;
+      }
+
+      await updateDoc(gameRef, {
+        players: [...(game.players || []), currentUser.uid],
+        spotsLeft: game.spotsLeft - 1,
+        commandersEnlisted: (game.commandersEnlisted || 0) + 1,
+        lastUpdated: new Date().toISOString()
+      });
+
+      // Refresh games
+      loadGames();
+    } catch (error) {
+      console.error('Error enlisting in game:', error);
+      setError('Failed to enlist in game');
+    }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -218,7 +220,7 @@ export default function Dashboard() {
       };
 
       const requestId = `${currentUser.uid}-${gameId}-${Date.now()}`;
-      await setDoc(doc(db, 'joinRequests', requestId), requestData);
+      await updateDoc(doc(db, 'joinRequests', requestId), requestData);
       
       setGameRequests(prev => ({
         ...prev,
@@ -450,7 +452,7 @@ export default function Dashboard() {
             <div className="relative">
               <div className="h-64 bg-gray-800"></div>
               <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col justify-center items-center px-12 text-center">
-                <h1 className="text-4xl font-bold text-white mb-3 font-impact uppercase tracking-wider">WELCOME TO THE RANKS, COMMANDER</h1>
+                <h1 className="text-4xl font-bold mb-3 font-impact uppercase tracking-wider">WELCOME TO THE RANKS, COMMANDER</h1>
                 <p className="text-xl text-gray-300">Your account has been successfully created. Prepare for battle in the financial markets.</p>
               </div>
             </div>
@@ -605,24 +607,23 @@ export default function Dashboard() {
               <div className="bg-gray-800 border-2 border-[#4A5D23] hover:border-[#D4AF37] transition-all rounded-lg p-6">
                 <h3 className="text-xl font-bold mb-4 font-impact uppercase tracking-wider">PAST SEASONS</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {pastSeasons.map(season => (
-                    <div key={season.id} className="bg-[rgba(74,93,35,0.2)] rounded-lg overflow-hidden">
+                  {pastGames.map(game => (
+                    <div key={game.id} className="bg-[rgba(74,93,35,0.2)] rounded-lg overflow-hidden">
                       <div className="h-48 bg-gray-700 relative overflow-hidden">
                         <img 
-                          src={season.image} 
-                          alt={season.name}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          src={game.image} 
+                          alt={game.name}
+                          className="w-full h-full object-cover"
                         />
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <h3 className="text-xl font-bold text-center px-4">{game.name}</h3>
+                        </div>
                       </div>
                       <div className="p-4">
-                        <h4 className="font-bold text-lg mb-1">{season.name}</h4>
-                        <p className="text-sm text-gray-400 mb-2">{formatHistoricalDate(season.date)}</p>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400">{season.players} Commanders</span>
-                          <div className="text-right">
-                            <span className="block text-xs text-gray-400">Victor</span>
-                            <span className="text-[#D4AF37] font-bold">{season.winner}</span>
-                          </div>
+                        <div className="text-sm text-gray-400">{formatHistoricalDate(game.date)}</div>
+                        <div className="mt-2">
+                          <div className="text-green-400">Winner: {game.winner}</div>
+                          <div className="text-gray-400">{game.players} Players</div>
                         </div>
                       </div>
                     </div>
@@ -687,4 +688,6 @@ export default function Dashboard() {
       </Modal>
     </>
   );
-}
+};
+
+export default Dashboard;

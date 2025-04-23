@@ -77,63 +77,77 @@ const GameRequests = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Game Requests</h2>
+      <h2 className="text-xl font-bold mb-6">Game Requests</h2>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-gray-800">
-          <thead>
-            <tr className="border-b border-gray-700">
-              <th className="px-4 py-2">From Player</th>
-              <th className="px-4 py-2">To Player</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Created At</th>
-              <th className="px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map(request => (
-              <tr key={request.id} className="border-b border-gray-700">
-                <td className="px-4 py-2">{request.fromPlayerName}</td>
-                <td className="px-4 py-2">{request.toPlayerName}</td>
-                <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded ${
-                    request.status === 'pending' ? 'bg-yellow-600' :
-                    request.status === 'approved' ? 'bg-green-600' :
-                    'bg-red-600'
-                  }`}>
-                    {request.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2">{new Date(request.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-2">
-                  {request.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => handleApprove(request)}
-                        className="px-3 py-1 bg-green-600 rounded-md mr-2"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(request.id)}
-                        className="px-3 py-1 bg-red-600 rounded-md mr-2"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => handleDelete(request.id)}
-                    className="px-3 py-1 bg-gray-600 rounded-md"
-                  >
-                    Delete
-                  </button>
-                </td>
+      {requests.length === 0 ? (
+        <div className="bg-gray-800 rounded-lg p-8 text-center">
+          <p className="text-lg text-gray-400">No game requests at this time</p>
+          <p className="text-sm text-gray-500 mt-2">New requests will appear here when players apply to join games</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-gray-800">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="px-4 py-2">From Player</th>
+                <th className="px-4 py-2">To Player</th>
+                <th className="px-4 py-2">Request Date</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {requests.map(request => (
+                <tr key={request.id} className="border-b border-gray-700">
+                  <td className="px-4 py-2">
+                    <div>
+                      <div>{request.fromPlayerName}</div>
+                      <div className="text-sm text-gray-400">{request.fromPlayerId}</div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">{request.toPlayerName}</td>
+                  <td className="px-4 py-2">
+                    {new Date(request.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`px-2 py-1 rounded ${
+                      request.status === 'pending' ? 'bg-yellow-600' :
+                      request.status === 'approved' ? 'bg-green-600' :
+                      'bg-red-600'
+                    }`}>
+                      {request.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    {request.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleApprove(request)}
+                          className="px-3 py-1 bg-green-600 rounded-md mr-2"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReject(request.id)}
+                          className="px-3 py-1 bg-red-600 rounded-md mr-2"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDelete(request.id)}
+                      className="px-3 py-1 bg-gray-600 rounded-md"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
