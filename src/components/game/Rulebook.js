@@ -1,105 +1,78 @@
 import React from 'react';
 
-export default function Rulebook() {
+const Rulebook = () => {
+  const rules = [
+    {
+      category: "Combat",
+      items: [
+        "Each player starts with 100 soldiers",
+        "Weekly income is based on investments and defense level",
+        "Attacks can only be performed during active battles",
+        "Defense level affects attack success rates"
+      ]
+    },
+    {
+      category: "Economy",
+      items: [
+        "Markets update every week",
+        "Investment returns vary by market volatility",
+        "Minimum investment is 10 soldiers",
+        "Maximum investment is 1000 soldiers per market"
+      ]
+    },
+    {
+      category: "Actions",
+      items: [
+        "3 actions available per week",
+        "Actions reset every Monday at 00:00 UTC",
+        "Unused actions do not carry over",
+        "Each market action counts as one action"
+      ]
+    },
+    {
+      category: "Alliances",
+      items: [
+        "Maximum 5 players per alliance",
+        "Alliance members can share market intel",
+        "Coordinated attacks require alliance membership",
+        "Alliance benefits unlock at different levels"
+      ]
+    }
+  ];
+
   return (
-    <div className="text-gray-300 space-y-6">
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Game Overview</h3>
-        <p>Soldiers of Wealth is a strategic financial warfare game where commanders compete to build the strongest economic empire while defending against market threats and rival commanders.</p>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Basic Mechanics</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Each commander starts with a base number of soldiers and initial wealth.</li>
-          <li>Use your wealth to recruit more soldiers or invest in market positions.</li>
-          <li>Deploy soldiers to protect your investments or launch strategic market operations.</li>
-          <li>Monitor market conditions and adapt your strategy accordingly.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Command Center</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Your central hub for managing troops and resources</li>
-          <li>View real-time market intelligence and threat assessments</li>
-          <li>Issue orders to your soldiers and manage defensive positions</li>
-          <li>Track your empire's growth and performance metrics</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Market Operations</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Invest in various market sectors to generate wealth</li>
-          <li>Launch market offensives to gain strategic advantages</li>
-          <li>Defend against market volatility and competitor actions</li>
-          <li>Form alliances with other commanders for mutual benefit</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Victory Conditions</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Accumulate the highest total wealth by the end of the season</li>
-          <li>Control key market sectors</li>
-          <li>Build the largest and most efficient army</li>
-          <li>Complete special mission objectives</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Special Operations</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Intelligence Gathering: Deploy spies to gather market intel</li>
-          <li>Market Raids: Quick, targeted operations for immediate gains</li>
-          <li>Defensive Fortification: Strengthen your market positions</li>
-          <li>Alliance Operations: Coordinate with allies for complex missions</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Resource Management</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="game-card p-4">
-            <h4 className="font-bold mb-2">Soldiers</h4>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>Recruit new soldiers with wealth</li>
-              <li>Train soldiers for specialized operations</li>
-              <li>Deploy strategically for maximum effect</li>
-              <li>Maintain morale and efficiency</li>
+    <div className="bg-gray-900 text-white p-6 rounded-lg">
+      <h2 className="text-2xl font-bold mb-6">COMMANDER'S RULEBOOK</h2>
+      
+      <div className="space-y-8">
+        {rules.map((section, index) => (
+          <div key={index} className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-xl font-bold mb-4 text-green-500">
+              {section.category} Rules
+            </h3>
+            <ul className="space-y-3">
+              {section.items.map((rule, ruleIndex) => (
+                <li key={ruleIndex} className="flex items-start">
+                  <span className="text-green-500 mr-2">•</span>
+                  <span className="text-gray-300">{rule}</span>
+                </li>
+              ))}
             </ul>
           </div>
-          <div className="game-card p-4">
-            <h4 className="font-bold mb-2">Wealth</h4>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>Generate through market operations</li>
-              <li>Invest in infrastructure and training</li>
-              <li>Fund special operations and missions</li>
-              <li>Build and maintain alliances</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Seasonal Events</h3>
-        <ul className="list-disc pl-6 space-y-2">
-          <li>Market crashes and booms affect all players</li>
-          <li>Special missions and opportunities appear randomly</li>
-          <li>Global events impact market conditions</li>
-          <li>Season-end tournaments for bonus rewards</li>
+        ))}
+      </div>
+      
+      <div className="mt-8 bg-gray-800 p-6 rounded-lg">
+        <h3 className="text-xl font-bold mb-4">Important Notes</h3>
+        <ul className="space-y-2 text-gray-300">
+          <li>• Rules are subject to change with game updates</li>
+          <li>• Violation of rules may result in penalties</li>
+          <li>• Contact support for rule clarifications</li>
+          <li>• Fair play is enforced by automated systems</li>
         </ul>
-      </section>
-
-      <div className="mt-8 p-4 game-card">
-        <h3 className="text-xl font-bold text-gold-300 mb-3">Commander's Note</h3>
-        <p className="italic">
-          Remember, Commander: Victory in Soldiers of Wealth requires a perfect balance of strategic planning, 
-          resource management, and tactical execution. Study these rules well, but know that true mastery 
-          comes from battlefield experience. Good luck in your campaign for economic dominance.
-        </p>
       </div>
     </div>
   );
-}
+};
+
+export default Rulebook;

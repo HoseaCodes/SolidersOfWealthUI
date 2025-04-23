@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [showRulebook, setShowRulebook] = useState(false);
   const [showTraining, setShowTraining] = useState(false);
   const [showForum, setShowForum] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [gameRequests, setGameRequests] = useState({});
   const [nextBattle, setNextBattle] = useState(null);
   const [showRules, setShowRules] = useState(false);
@@ -303,13 +304,13 @@ const Dashboard = () => {
             
             <div className="flex items-center space-x-4">
               <button onClick={() => setShowRules(true)} className="text-gray-300 hover:text-white">Game Rules</button>
-              <Link to="#" className="text-gray-300 hover:text-white">FAQ</Link>
-              <Link to="#" className="text-gray-300 hover:text-white">Leaderboard</Link>
-              <div className="relative">
+              <button onClick={() => setShowComingSoon(true)} className="text-gray-300 hover:text-white">FAQ</button>
+              <button onClick={() => setShowComingSoon(true)} className="text-gray-300 hover:text-white">Leaderboard</button>
+              <Link to="/profile" className="relative">
                 <button className="flex items-center space-x-2">
                   <span className="text-white">{currentUser.email}</span>
                 </button>
-              </div>
+              </Link>
             </div>
           </nav>
 
@@ -648,10 +649,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </footer>
-          </div>
-          
-          {/* Game Rules Modal */}
-          <GameRules isOpen={showRules} onClose={() => setShowRules(false)} />
+          </div>          
         </div>
       </section>
 
@@ -667,6 +665,13 @@ const Dashboard = () => {
         pauseOnHover
         theme="dark"
       />
+      <Modal
+        isOpen={showRules}
+        onClose={() => setShowRules(false)}
+        title="Game Rules"
+      >
+        <GameRules />
+      </Modal>
 
       <Modal
         isOpen={showRulebook}
@@ -691,6 +696,58 @@ const Dashboard = () => {
       >
         <Forum />
       </Modal>
+
+      <Modal
+        isOpen={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+      >
+        <div className="bg-gray-900 text-white p-6 rounded-lg text-center">
+          <h2 className="text-2xl font-bold mb-4">COMING SOON!</h2>
+          <p className="text-gray-300 mb-6">
+           This feature is currently in production. Stay tuned, Commander!
+          </p>
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            UNDERSTOOD
+          </button>
+        </div>
+      </Modal>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <button
+          onClick={() => setShowRulebook(true)}
+          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
+        >
+          <FaBook className="text-3xl text-green-500 mb-2" />
+          <span className="font-bold">Rulebook</span>
+        </button>
+
+        <button
+          onClick={() => setShowTraining(true)}
+          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
+        >
+          <FaGraduationCap className="text-3xl text-green-500 mb-2" />
+          <span className="font-bold">Training</span>
+        </button>
+
+        <button
+          onClick={() => setShowForum(true)}
+          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
+        >
+          <FaComments className="text-3xl text-green-500 mb-2" />
+          <span className="font-bold">Forum</span>
+        </button>
+
+        <button
+          onClick={() => setShowComingSoon(true)}
+          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
+        >
+          <FaPlay className="text-3xl text-green-500 mb-2" />
+          <span className="font-bold">Watch Gameplay</span>
+        </button>
+      </div>
     </>
   );
 };

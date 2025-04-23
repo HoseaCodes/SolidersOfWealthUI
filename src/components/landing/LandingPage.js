@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Modal from '../common/Modal';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   return (
     <div className="min-h-screen">
@@ -39,7 +41,7 @@ export default function LandingPage() {
             <button onClick={() => navigate('/signup')} className="px-6 py-3 button-military rounded-md text-lg">
               Join the Battle
             </button>
-            <button className="px-6 py-3 button-gold rounded-md text-lg">
+            <button onClick={() => setShowComingSoon(true)} className="px-6 py-3 button-gold rounded-md text-lg">
               Watch Gameplay
             </button>
           </div>
@@ -155,6 +157,23 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      <Modal
+        isOpen={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+      >
+        <div className="bg-gray-900 text-white p-6 rounded-lg text-center">
+          <h2 className="text-2xl font-bold mb-4">COMING SOON!</h2>
+          <p className="text-gray-300 mb-6">
+            Our gameplay videos are currently in production. Stay tuned, Commander!
+          </p>
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            UNDERSTOOD
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

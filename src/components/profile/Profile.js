@@ -318,6 +318,20 @@ const Profile = () => {
           {showDeleteConfirm ? 'CLICK AGAIN TO CONFIRM DELETION' : 'DELETE ACCOUNT'}
         </Button>
       </Form>
+      <Button 
+        type="button" 
+        onClick={() => navigate('/dashboard')}
+        style={{ marginTop: '1rem', width: 'auto' }}
+      >
+        BACK TO DASHBOARD
+      </Button>
+      <Button 
+        type="button" 
+        onClick={() => navigate('/commandcenter')}
+        style={{ marginTop: '1rem', width: 'auto' }}
+      >
+        BACK TO COMMAND CENTER
+      </Button>
     </ProfileContainer>
   );
 };
