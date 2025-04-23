@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
-const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit, onViewMarket }) => {
+const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit, onViewMarket, onViewBattlefield }) => {
   const [selectedActions, setSelectedActions] = useState({
     investment: null,
     offensive: null,
@@ -18,7 +18,9 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
   const [otherPlayers, setOtherPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [currentAction, setCurrentAction] = useState(null);
+  const [activeTab, setActiveTab] = useState('investment');
+
   const db = getFirestore();
 
   const actions = {
@@ -84,9 +86,20 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
             type: 'invest',
             amount: 10, // Default amount
             market: selectedMarkets[category] // Keep current market if exists
-          }
+          },
+          offensive: currentAction?.offensive // Keep offensive data
         });
       }
+    } else if (category === 'offensive') {
+      // Add offensive data to current action
+      onActionSubmit({
+        investment: currentAction?.investment, // Keep investment data
+        offensive: {
+          type: action.id,
+          targetPlayer: targetPlayer,
+          market: selectedMarkets[category]
+        }
+      });
     }
   };
 
@@ -103,15 +116,23 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
           type: 'invest',
           amount: investmentAmount,
           market: market
+        },
+        offensive: currentAction?.offensive // Keep offensive data
+      });
+    } else if (category === 'offensive' && selectedActions[category]) {
+      onActionSubmit({
+        investment: currentAction?.investment, // Keep investment data
+        offensive: {
+          type: selectedActions[category].id,
+          targetPlayer: targetPlayer,
+          market: market
         }
       });
     }
   };
 
-  const handleInvestmentAmountChange = (amount) => {
-    const newAmount = parseInt(amount) || 0;
+  const handleInvestmentAmountChange = (newAmount) => {
     setInvestmentAmount(newAmount);
-    
     // Update deployment display with new amount
     if (selectedActions.investment?.id === 'invest' && selectedMarkets.investment) {
       onActionSubmit({
@@ -119,6 +140,21 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
           type: 'invest',
           amount: newAmount,
           market: selectedMarkets.investment
+        },
+        offensive: currentAction?.offensive // Keep offensive data
+      });
+    }
+  };
+
+  const handleTargetPlayerSelect = (playerId) => {
+    setTargetPlayer(playerId);
+    if (selectedActions.offensive) {
+      onActionSubmit({
+        investment: currentAction?.investment, // Keep investment data
+        offensive: {
+          type: selectedActions.offensive.id,
+          targetPlayer: playerId,
+          market: selectedMarkets.offensive
         }
       });
     }
@@ -234,6 +270,14 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
           VIEW MARKET DASHBOARD →
         </button>
       )}
+      {category === 'offensive' && (
+        <button 
+          onClick={() => onViewBattlefield()}
+          className="inline-block mb-4 px-4 py-2 bg-gray-700/50 hover:bg-gray-600/50 rounded border border-gray-600 text-sm transition-all duration-300"
+        >
+          VIEW BATTLEFIELD →
+        </button>
+      )}
       <p className="mb-4 text-gray-400 text-sm">
         {category === 'investment' 
           ? 'Deploy your soldiers strategically to maximize resource gains.'
@@ -300,7 +344,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
               <select
                 className="bg-gray-700/50 p-2 rounded border border-gray-600 text-sm"
                 value={targetPlayer}
-                onChange={(e) => setTargetPlayer(e.target.value)}
+                onChange={(e) => handleTargetPlayerSelect(e.target.value)}
               >
                 <option value="">SELECT TARGET COMMANDER</option>
                 {otherPlayers.map(player => (

@@ -353,6 +353,104 @@
   }
 }
 
+/* Intelligence Screen Styles */
+.military-header {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.game-card {
+    background-color: #2c3e50;
+    border: 2px solid #4A5D23;
+    transition: all 0.3s ease;
+}
+
+.game-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    border-color: #D4AF37;
+}
+
+.player-card {
+    background-color: #2c3e50;
+    border: 1px solid #4A5D23;
+    transition: all 0.3s ease;
+}
+
+.player-card:hover {
+    transform: scale(1.03);
+}
+
+.rank-1 {
+    background-color: rgba(212, 175, 55, 0.15);
+    border-left: 4px solid #D4AF37;
+}
+
+.rank-2 {
+    background-color: rgba(192, 192, 192, 0.15);
+    border-left: 4px solid #C0C0C0;
+}
+
+.rank-3 {
+    background-color: rgba(205, 127, 50, 0.15);
+    border-left: 4px solid #CD7F32;
+}
+
+.rank-you {
+    background-color: rgba(74, 93, 35, 0.15);
+    border-left: 4px solid #4A5D23;
+}
+
+.medal-gold {
+    color: #D4AF37;
+}
+
+.medal-silver {
+    color: #C0C0C0;
+}
+
+.medal-bronze {
+    color: #CD7F32;
+}
+
+.stat-card {
+    background-color: #2c3e50;
+    border-bottom: 3px solid;
+}
+
+.stat-up {
+    border-bottom-color: #4A5D23;
+}
+
+.stat-down {
+    border-bottom-color: #C1292E;
+}
+
+.achievement-locked {
+    opacity: 0.5;
+}
+
+.tab-active {
+    background-color: #4A5D23;
+    color: white;
+    font-weight: bold;
+}
+
+.tab-inactive {
+    background-color: #2c3e50;
+    color: #A9B4C2;
+}
+
+.tab-inactive:hover {
+    background-color: #3d5269;
+}
+
+.economy-downturn {
+    background-color: rgba(193, 41, 46, 0.2);
+    border-left: 4px solid #C1292E;
+}
+
 /* Global Styles */
 body {
   margin: 0;

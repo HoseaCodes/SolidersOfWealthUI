@@ -9,6 +9,7 @@ import Modal from '../common/Modal';
 import Rulebook from '../game/Rulebook';
 import Training from '../game/Training';
 import Forum from '../game/Forum';
+import GameRules from '../game/GameRules';
 
 const Dashboard = () => {
   const [upcomingGames, setUpcomingGames] = useState([]);
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const [showForum, setShowForum] = useState(false);
   const [gameRequests, setGameRequests] = useState({});
   const [nextBattle, setNextBattle] = useState(null);
+  const [showRules, setShowRules] = useState(false);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const db = getFirestore();
@@ -300,7 +302,7 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Link to="#" className="text-gray-300 hover:text-white">Game Rules</Link>
+              <button onClick={() => setShowRules(true)} className="text-gray-300 hover:text-white">Game Rules</button>
               <Link to="#" className="text-gray-300 hover:text-white">FAQ</Link>
               <Link to="#" className="text-gray-300 hover:text-white">Leaderboard</Link>
               <div className="relative">
@@ -647,6 +649,9 @@ const Dashboard = () => {
               </div>
             </footer>
           </div>
+          
+          {/* Game Rules Modal */}
+          <GameRules isOpen={showRules} onClose={() => setShowRules(false)} />
         </div>
       </section>
 

@@ -20,6 +20,7 @@ const CommandCenter = () => {
   const [attackSoldiers, setAttackSoldiers] = useState(50);
   const { currentUser } = useAuth();
   const db = getFirestore();
+  const playerId = currentUser?.uid;
 
   const players = [
     {
@@ -167,164 +168,129 @@ const CommandCenter = () => {
     </div>
   );
 
-  const renderBattlefield = () => (
-    <div className="p-6">
-      {/* Economic Status Alert */}
-      <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
-        <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
-        <p className="text-gray-400">
-          Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
-          Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
-          Business {marketStatus.business}%
-        </p>
-      </div>
-      
-      {/* Battlefield Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-2xl font-bold military-header">BATTLEFIELD MAP</h3>
-          <p className="text-gray-400">Strategic view of all commanders and their positions</p>
+  const renderBattlefield = () => {
+    return (
+      <div className="space-y-6">
+        {/* Economic Status Alert */}
+        <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+          <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+          <p className="text-gray-400">
+            Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+            Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+            Business {marketStatus.business}%
+          </p>
         </div>
         
-        <div className="flex space-x-3">
-          <button className="px-4 py-2 button-attack rounded">Attack</button>
-          <button className="px-4 py-2 button-finance rounded">Deploy Spy</button>
-          <button className="px-4 py-2 button-military rounded">Form Alliance</button>
-        </div>
-      </div>
-      
-      {/* Battlefield Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Players List */}
-        <div className="space-y-4">
-          <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">COMMANDERS</h4>
-          {players.map(player => renderPlayerCard(player))}
+        {/* Battlefield Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-2xl font-bold military-header">BATTLEFIELD MAP</h3>
+            <p className="text-gray-400">Strategic view of all commanders and their positions</p>
+          </div>
         </div>
         
-        {/* Center: Battlefield Grid */}
-        <div className="col-span-2">
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="battlefield-grid">
-              {battlefieldTiles.map((tile, index) => renderBattlefieldTile(tile, index))}
-            </div>
-            
-            {/* Legend */}
-            <div className="mt-6 flex flex-wrap justify-center space-x-4">
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-green-700 mr-2"></div>
-                <span className="text-xs text-gray-400">Your Territory</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-red-700 mr-2"></div>
-                <span className="text-xs text-gray-400">Enemy</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-blue-700 mr-2"></div>
-                <span className="text-xs text-gray-400">Market</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-yellow-600 mr-2"></div>
-                <span className="text-xs text-gray-400">Special Event</span>
-              </div>
-            </div>
+        {/* Battlefield Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left: Players List */}
+          <div className="space-y-4">
+            <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">COMMANDERS</h4>
+            {players.map(player => renderPlayerCard(player))}
           </div>
           
-          {/* Action Panel */}
-          <div className="mt-6 bg-gray-800 p-4 rounded-lg">
-            <h4 className="font-bold mb-3 border-b border-gray-700 pb-2">BATTLEFIELD ACTIONS</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="game-card p-4 rounded-lg">
-                <h5 className="font-bold mb-2">DIRECT ATTACK</h5>
-                <p className="text-sm text-gray-400 mb-4">Launch an offensive to capture soldiers from another commander.</p>
-                
-                <div className="mb-3">
-                  <label className="text-sm block mb-1">Target Commander:</label>
-                  <select 
-                    className="battlefield-select"
-                    value={selectedPlayer}
-                    onChange={(e) => setSelectedPlayer(e.target.value)}
-                  >
-                    <option value="">Select a target</option>
-                    {players.filter(p => !p.isYou).map(player => (
-                      <option key={player.id} value={player.id}>
-                        {player.name} ({player.defense} Defense)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="mb-3">
-                  <label className="text-sm block mb-1">Commit Soldiers: {attackSoldiers}</label>
-                  <input 
-                    type="range" 
-                    min="10" 
-                    max="100" 
-                    value={attackSoldiers}
-                    onChange={(e) => setAttackSoldiers(parseInt(e.target.value))}
-                    className="battlefield-range w-full"
-                  />
-                </div>
-                
-                {selectedPlayer && (
-                  <div className="flex justify-between text-sm mb-4">
-                    <div>
-                      <span className="text-gray-400">Chance of Success:</span>
-                      <span className="text-green-500 ml-1">
-                        {calculateSuccessChance(
-                          players.find(p => p.isYou),
-                          players.find(p => p.id === selectedPlayer)
-                        )}%
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Potential Gain:</span>
-                      <span className="text-white ml-1">~{Math.round(attackSoldiers * 0.5)} Soldiers</span>
-                    </div>
-                  </div>
-                )}
-                
-                <button 
-                  className="w-full py-2 button-attack rounded"
-                  disabled={!selectedPlayer}
-                >
-                  Launch Attack
-                </button>
+          {/* Center: Battlefield Grid */}
+          <div className="col-span-2">
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="battlefield-grid">
+                {battlefieldTiles.map((tile, index) => renderBattlefieldTile(tile, index))}
               </div>
               
-              <div className="game-card p-4 rounded-lg">
-                <h5 className="font-bold mb-2">DEPLOY SPY</h5>
-                <p className="text-sm text-gray-400 mb-4">Gather intelligence about enemy positions and investments.</p>
-                
-                <div className="mb-3">
-                  <label className="text-sm block mb-1">Target Commander:</label>
-                  <select className="battlefield-select">
-                    <option>Select a target</option>
-                    {players.filter(p => !p.isYou).map(player => (
-                      <option key={player.id}>{player.name}</option>
-                    ))}
-                  </select>
+              {/* Legend */}
+              <div className="mt-6 flex flex-wrap justify-center space-x-4">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-green-700 mr-2"></div>
+                  <span className="text-xs text-gray-400">Your Territory</span>
                 </div>
-                
-                <div className="mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Cost:</span>
-                    <span className="text-white">10 Soldiers</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Duration:</span>
-                    <span className="text-white">2 Turns</span>
-                  </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-red-700 mr-2"></div>
+                  <span className="text-xs text-gray-400">Enemy</span>
                 </div>
-                
-                <button className="w-full py-2 button-finance rounded">Deploy Spy</button>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-700 mr-2"></div>
+                  <span className="text-xs text-gray-400">Market</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-yellow-600 mr-2"></div>
+                  <span className="text-xs text-gray-400">Special Event</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Battlefield Actions */}
+        <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700">
+          <h3 className="text-xl font-bold military-header mb-4">BATTLEFIELD ACTIONS</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {players.filter(p => p.id !== playerId).map(player => (
+              <div key={player.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-bold">{player.name.toUpperCase()}</h4>
+                    <div className="text-sm text-gray-400">
+                      <span className="mr-2">SOLDIERS: {player.soldiers || 0}</span>
+                      <span>TERRITORY: {player.territory || 'Unknown'}</span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <img src="/images/avatar.png" alt="Player Avatar" className="h-12 w-12 rounded-full" />
+                    {player.status === 'online' && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleBattlefieldAction('attack', player.id)}
+                    className="w-full py-2 px-4 bg-red-900/50 hover:bg-red-800/50 rounded border border-red-700 transition-all duration-300 hover:scale-105"
+                  >
+                    LAUNCH ATTACK
+                  </button>
+                  <button
+                    onClick={() => handleBattlefieldAction('spy', player.id)}
+                    className="w-full py-2 px-4 bg-gray-700/50 hover:bg-gray-600/50 rounded border border-gray-600 transition-all duration-300 hover:scale-105"
+                  >
+                    DEPLOY SPY
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Return to Command Center */}
+        <button
+          onClick={() => setActiveTab('command')}
+          className="w-full py-3 bg-gray-700/50 hover:bg-gray-600/50 rounded px-4 transition-all duration-300"
+        >
+          RETURN TO COMMAND CENTER
+        </button>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const handleBattlefieldAction = (actionType, targetPlayerId) => {
+    const targetPlayer = players.find(p => p.id === targetPlayerId);
+    const actionData = {
+      investment: currentAction?.investment, // Keep existing investment data
+      offensive: {
+        type: actionType,
+        targetPlayer: targetPlayerId,
+        targetName: targetPlayer?.name || 'Unknown Commander'
+      }
+    };
+    setCurrentAction(actionData);
+    setActiveTab('command'); // Return to command center to show the selection
+  };
 
   const tabClass = (tabName) => 
     `px-6 py-3 ${activeTab === tabName ? 'tab-active' : 'tab-inactive'} transition-colors duration-200`;
@@ -362,6 +328,29 @@ const CommandCenter = () => {
       }
     });
     setActiveTab('command'); // Switch back to command tab after investment
+  };
+
+  const handleActionSubmit = (actionData) => {
+    // Only update if we have valid action data
+    if (actionData === null) {
+      setCurrentAction(null);
+      return;
+    }
+    
+    // Validate soldier amount for investments
+    if (actionData.investment?.amount > soldiers) {
+      return; // Don't update if amount exceeds available soldiers
+    }
+    
+    setCurrentAction(actionData);
+  };
+
+  const handleViewMarket = () => {
+    setActiveTab('market');
+  };
+
+  const handleViewBattlefield = () => {
+    setActiveTab('battlefield');
   };
 
   const renderMarketDashboard = () => {
@@ -502,55 +491,274 @@ const CommandCenter = () => {
     );
   };
 
-  const handleActionSubmit = (actionData) => {
-    // Only update if we have valid action data
-    if (actionData === null) {
-      setCurrentAction(null);
-      return;
-    }
-    
-    // Validate soldier amount
-    if (actionData.investment?.amount > soldiers) {
-      return; // Don't update if amount exceeds available soldiers
-    }
-    
-    setCurrentAction(actionData);
-  };
-
-  const handleViewMarket = () => {
-    setActiveTab('market');
-  };
-
   const renderCurrentAction = () => {
-    if (!currentAction?.investment) return null;
-
-    const { type, amount, market } = currentAction.investment;
-    if (type !== 'invest' || !market) return null;
-
-    const marketDisplay = {
-      stocks: 'STOCK MARKET',
-      realEstate: 'REAL ESTATE',
-      crypto: 'CRYPTOCURRENCY',
-      business: 'BUSINESS'
-    };
+    if (!currentAction) return null;
 
     return (
-      <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
-        <h3 className="text-xl font-bold military-header mb-4">STRATEGIC DEPLOYMENT</h3>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-gray-400 text-sm mb-1">CURRENT DEPLOYMENT</div>
-            <div className="font-bold">{marketDisplay[market] || market.toUpperCase()}</div>
+      <>
+        {/* Investment Display */}
+        {currentAction.investment && (
+          <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
+            <h3 className="text-xl font-bold military-header mb-4">STRATEGIC DEPLOYMENT</h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-400 text-sm mb-1">CURRENT DEPLOYMENT</div>
+                <div className="font-bold">
+                  {currentAction.investment.market ? currentAction.investment.market.toUpperCase() : 'NO MARKET SELECTED'}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">DEPLOYED FORCES</div>
+                <div className="font-bold">{currentAction.investment.amount} SOLDIERS</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">REMAINING FORCES</div>
+                <div className="font-bold">{soldiers - currentAction.investment.amount} SOLDIERS</div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-gray-400 text-sm mb-1">DEPLOYED FORCES</div>
-            <div className="font-bold">{amount} SOLDIERS</div>
+        )}
+
+        {/* Offensive Operations Display */}
+        {currentAction.offensive && (
+          <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
+            <h3 className="text-xl font-bold military-header mb-4">OFFENSIVE OPERATIONS</h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-400 text-sm mb-1">OPERATION TYPE</div>
+                <div className={`font-bold ${currentAction.offensive.type === 'attack' ? 'text-red-500' : 'text-gray-300'}`}>
+                  {currentAction.offensive.type === 'attack' ? 'DIRECT ASSAULT' : 'DEPLOY SPY'}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">TARGET COMMANDER</div>
+                <div className="font-bold flex items-center">
+                  <img src="/images/avatar.png" alt="Target Avatar" className="h-6 w-6 rounded-full mr-2" />
+                  {currentAction.offensive.targetName.toUpperCase()}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">OPERATION COST</div>
+                <div className="font-bold">
+                  {currentAction.offensive.type === 'attack' ? '25' : '10'} SOLDIERS
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-gray-400 text-sm mb-1">REMAINING FORCES</div>
-            <div className="font-bold">{soldiers - amount} SOLDIERS</div>
+        )}
+      </>
+    );
+  };
+
+  const [intelligenceTab, setIntelligenceTab] = useState('leaderboard');
+  const [playerStats, setPlayerStats] = useState({
+    soldierGrowth: 15,
+    attackSuccess: 60,
+    defenseRate: 75,
+    investmentROI: 10,
+    wins: 0,
+    successfulAttacks: 1,
+    successfulDefenses: 3,
+    totalAttacks: 2,
+    totalDefenses: 4
+  });
+
+  const [achievements, setAchievements] = useState([
+    { id: 1, name: 'First Blood', description: 'Successfully attack another commander', unlocked: true },
+    { id: 2, name: 'Diversified Portfolio', description: 'Invest in 3 different markets', unlocked: true },
+    { id: 3, name: 'War Profiteer', description: 'Capture 50+ soldiers in a single week', unlocked: false },
+    { id: 4, name: 'Market Guru', description: 'Achieve 30%+ return in any market', unlocked: false }
+  ]);
+
+  const [weeklyHighlights, setWeeklyHighlights] = useState({
+    topInvestor: { name: 'Romado S.', achievement: '+48% Crypto Return' },
+    battlefieldCommander: { name: 'Charles Nolen II', achievement: '3 Successful Attacks' },
+    defensiveStrategist: { name: 'Grace Anderson', achievement: '100% Defense Rate' }
+  });
+
+  const renderIntelligence = () => {
+    const renderLeaderboard = () => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Leaderboard Rankings */}
+        <div className="col-span-2">
+          <div className="mb-6">
+            <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">SEASON 1 LEADERBOARD</h4>
+            
+            {/* Player Rankings */}
+            <div className="space-y-3">
+              {players.map((player, index) => (
+                <div key={player.id} className={`player-card p-4 rounded-lg ${
+                  index === 0 ? 'rank-1' :
+                  index === 1 ? 'rank-2' :
+                  index === 2 ? 'rank-3' :
+                  player.id === currentUser?.uid ? 'rank-you' : ''
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="text-center mr-4 w-8">
+                        <span className={`text-xl font-bold ${
+                          index === 0 ? 'medal-gold' :
+                          index === 1 ? 'medal-silver' :
+                          index === 2 ? 'medal-bronze' : ''
+                        }`}>{index + 1}</span>
+                      </div>
+                      <img src="/images/avatar.png" alt="Player Avatar" className="h-10 w-10 rounded-full mr-3" />
+                      <div>
+                        <div className="flex items-center">
+                          <h5 className="font-bold">{player.id === currentUser?.uid ? 'YOU' : player.name}</h5>
+                        </div>
+                        <p className="text-sm text-gray-400">Commander {player.commanderTitle}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-white">{player.soldiers}</span>
+                      <p className="text-xs text-gray-400">SOLDIERS</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-between text-xs text-gray-500">
+                    <span>{player.investmentSummary || 'No Investments'}</span>
+                    <span>Wins: {player.wins || 0}</span>
+                    <span>{player.attackSummary || `Losses: ${player.losses || 0}`}</span>
+                    <span>K/D Ratio: {player.kdRatio || 0}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Right: Weekly Highlights */}
+        <div>
+          <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">WEEK {currentWeek} HIGHLIGHTS</h4>
+          <div className="space-y-4">
+            {Object.entries(weeklyHighlights).map(([key, highlight]) => (
+              <div key={key} className="game-card p-4 rounded-lg">
+                <h5 className="font-bold mb-2 text-center">
+                  {key.split(/(?=[A-Z])/).join(' ').toUpperCase()}
+                </h5>
+                <div className="flex flex-col items-center">
+                  <img src="/images/avatar.png" alt="Player Avatar" className="h-16 w-16 rounded-full mb-2" />
+                  <p className="font-bold">{highlight.name}</p>
+                  <p className="text-sm text-gray-400">{highlight.achievement}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    const renderPerformance = () => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="mb-6">
+          <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">YOUR PERFORMANCE</h4>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="stat-card stat-up p-3 rounded-lg text-center">
+              <p className="text-sm text-gray-400">SOLDIER GROWTH</p>
+              <p className="text-2xl font-bold">+{playerStats.soldierGrowth}%</p>
+              <p className="text-xs text-gray-500">WEEK-OVER-WEEK</p>
+            </div>
+            
+            <div className={`stat-card ${playerStats.attackSuccess >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+              <p className="text-sm text-gray-400">ATTACK SUCCESS</p>
+              <p className="text-2xl font-bold">{playerStats.attackSuccess}%</p>
+              <p className="text-xs text-gray-500">{playerStats.successfulAttacks} OF {playerStats.totalAttacks} ATTACKS</p>
+            </div>
+            
+            <div className={`stat-card ${playerStats.defenseRate >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+              <p className="text-sm text-gray-400">DEFENSE RATE</p>
+              <p className="text-2xl font-bold">{playerStats.defenseRate}%</p>
+              <p className="text-xs text-gray-500">{playerStats.successfulDefenses} OF {playerStats.totalDefenses} DEFENSES</p>
+            </div>
+            
+            <div className={`stat-card ${playerStats.investmentROI >= 0 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+              <p className="text-sm text-gray-400">INVESTMENT ROI</p>
+              <p className="text-2xl font-bold">{playerStats.investmentROI}%</p>
+              <p className="text-xs text-gray-500">AVERAGE RETURN</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="game-card p-4 rounded-lg">
+          <h5 className="font-bold mb-3 text-center">SOLDIER COUNT HISTORY</h5>
+          <div className="h-40 bg-gray-800 rounded-lg p-3">
+            {/* Add chart component here */}
+          </div>
+        </div>
+      </div>
+    );
+
+    const renderAchievements = () => (
+      <div className="mx-auto">
+        <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">ACHIEVEMENTS</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {achievements.map(achievement => (
+            <div key={achievement.id} className={`game-card ${!achievement.unlocked && 'achievement-locked'} p-3 rounded-lg flex items-center`}>
+              <div className={`${achievement.unlocked ? 'bg-green-800' : 'bg-gray-700'} h-10 w-10 rounded-full flex items-center justify-center mr-3`}>
+                <span className="text-lg">{achievement.unlocked ? '✓' : '?'}</span>
+              </div>
+              <div>
+                <h5 className="font-bold text-sm">{achievement.name}</h5>
+                <p className="text-xs text-gray-400">{achievement.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    const renderMarketIntel = () => (
+      <div>
+        <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+          <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+          <p className="text-gray-400">
+            Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+            Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+            Business {marketStatus.business}%
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Object.entries(marketStatus).map(([market, change]) => (
+            <div key={market} className={`game-card p-4 rounded-lg ${change >= 0 ? 'stat-up' : 'stat-down'}`}>
+              <h5 className="font-bold mb-2">{market.toUpperCase()}</h5>
+              <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {change > 0 ? '+' : ''}{change}%
+              </p>
+              <p className="text-sm text-gray-400">Weekly Change</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold military-header">INTELLIGENCE CENTER</h3>
+          <p className="text-gray-400">Track battalion rankings, performance metrics, and strategic opportunities</p>
+        </div>
+
+        <div className="border-b border-gray-700 mb-6">
+          <div className="flex space-x-1">
+            {['leaderboard', 'performance', 'achievements', 'market'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setIntelligenceTab(tab)}
+                className={`px-4 py-2 rounded-t-md ${
+                  intelligenceTab === tab ? 'tab-active' : 'tab-inactive'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {intelligenceTab === 'leaderboard' && renderLeaderboard()}
+        {intelligenceTab === 'performance' && renderPerformance()}
+        {intelligenceTab === 'achievements' && renderAchievements()}
+        {intelligenceTab === 'market' && renderMarketIntel()}
       </div>
     );
   };
@@ -561,13 +769,13 @@ const CommandCenter = () => {
         {/* Top Navigation Bar */}
         <nav className="bg-gray-800 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <img src={"/logo.png"} alt="Logo" className="h-10 w-10 mr-3" />
+            <img src={"/images/logo.png"} alt="Logo" className="h-10 w-10 mr-3" />
             <span className="text-xl font-bold text-white military-header">SOLDIERS OF WEALTH</span>
           </div>
           
           <div className="flex items-center space-x-6">
             <div className="soldier-counter px-4 py-2 rounded-lg flex items-center">
-              <img src={"/soldierIcon.png"} alt="Soldier Icon" className="h-8 w-8 mr-2" />
+              <img src={"/images/soldier.png"} alt="Soldier Icon" className="h-8 w-8 mr-2" />
               <span className="text-xl font-bold text-white">165 SOLDIERS</span>
             </div>
             
@@ -599,33 +807,33 @@ const CommandCenter = () => {
         {/* Command Center Tabs */}
         <div className="flex border-b border-gray-700">
           <button 
-            className={tabClass('command')} 
-            onClick={() => setActiveTab('command')}
+            onClick={() => setActiveTab('command')} 
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'command' ? 'bg-gray-900 text-white border-t-2 border-gold' : 'text-gray-400 hover:text-white'}`}
           >
-            Command Center
+            COMMAND
           </button>
           <button 
-            className={tabClass('market')} 
-            onClick={() => setActiveTab('market')}
+            onClick={() => setActiveTab('market')} 
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'market' ? 'bg-gray-900 text-white border-t-2 border-gold' : 'text-gray-400 hover:text-white'}`}
           >
-            Market Dashboard
+            MARKET
           </button>
           <button 
-            className={tabClass('battlefield')} 
-            onClick={() => setActiveTab('battlefield')}
+            onClick={() => setActiveTab('battlefield')} 
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'battlefield' ? 'bg-gray-900 text-white border-t-2 border-gold' : 'text-gray-400 hover:text-white'}`}
           >
-            Battlefield
+            BATTLEFIELD
           </button>
           <button 
-            className={tabClass('intelligence')} 
-            onClick={() => setActiveTab('intelligence')}
+            onClick={() => setActiveTab('intelligence')} 
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'intelligence' ? 'bg-gray-900 text-white border-t-2 border-gold' : 'text-gray-400 hover:text-white'}`}
           >
-            Intelligence
+            INTELLIGENCE
           </button>
         </div>
         
         {/* Main Content */}
-        {activeTab === 'market' ? renderMarketDashboard() : activeTab === 'battlefield' ? renderBattlefield() : (
+        {activeTab === 'market' ? renderMarketDashboard() : activeTab === 'battlefield' ? renderBattlefield() : activeTab === 'intelligence' ? renderIntelligence() : (
           <div className="p-6">
             {/* Original Command Center Content */}
             {/* Economic Status Alert */}
@@ -647,6 +855,7 @@ const CommandCenter = () => {
               soldiers={soldiers}
               onActionSubmit={handleActionSubmit}
               onViewMarket={handleViewMarket}
+              onViewBattlefield={handleViewBattlefield}
             />
             
             {/* Game Board Visual */}
