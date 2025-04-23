@@ -3,6 +3,7 @@ import { FaBell, FaUserCircle } from 'react-icons/fa';
 import PlayerActions from './PlayerActions';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
 const CommandCenter = () => {
   const [activeTab, setActiveTab] = useState('command');
@@ -792,14 +793,14 @@ const CommandCenter = () => {
             </div>
             
             <div className="relative">
-              <button className="relative">
+               <Link to="/profile" className="relative">
                 <FaUserCircle className="h-10 w-10 text-gray-400" />
                 {notifications > 0 && (
                   <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
                     {notifications}
                   </span>
                 )}
-              </button>
+              </Link>
             </div>
           </div>
         </nav>

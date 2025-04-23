@@ -10,6 +10,7 @@ import Game from './components/game/Game';
 import CommandCenter from './components/game/CommandCenter';
 import Dashboard from './components/dashboard/Dashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
+import Profile from './components/profile/Profile';
 
 function App() {
   return (
@@ -33,6 +34,11 @@ function App() {
               <Route path="/commandcenter" element={
                 <PrivateRoute>
                   <CommandCenter />
+                </PrivateRoute>
+              } />
+              <Route path="/profile" element={
+                <PrivateRoute>
+                  <Profile />
                 </PrivateRoute>
               } />
               <Route path="/admin" element={
