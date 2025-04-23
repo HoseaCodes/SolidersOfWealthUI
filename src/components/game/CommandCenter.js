@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaBell, FaUserCircle } from 'react-icons/fa';
+import PlayerActions from './PlayerActions';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CommandCenter = () => {
   const [activeTab, setActiveTab] = useState('command');
@@ -12,6 +15,8 @@ const CommandCenter = () => {
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attackSoldiers, setAttackSoldiers] = useState(50);
+  const { currentUser } = useAuth();
+  const db = getFirestore();
 
   const players = [
     {
@@ -541,51 +546,13 @@ const CommandCenter = () => {
               </p>
             </div>
             
-            {/* Action Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="game-card p-6 rounded-lg">
-                <h3 className="text-xl font-bold mb-4 text-center">INVESTMENT</h3>
-                <p className="mb-4 text-gray-400 text-center">Deploy your soldiers into markets to grow your wealth.</p>
-                <div className="space-y-3">
-                  <button className="w-full py-3 button-finance rounded flex justify-between items-center px-4">
-                    <span>Stocks</span>
-                    <span className="text-red-500">{marketStatus.stocks}%</span>
-                  </button>
-                  <button className="w-full py-3 button-military rounded flex justify-between items-center px-4">
-                    <span>Real Estate</span>
-                    <span className="text-red-500">{marketStatus.realEstate}%</span>
-                  </button>
-                  <button className="w-full py-3 button-gold rounded flex justify-between items-center px-4">
-                    <span>Cryptocurrency</span>
-                    <span className="text-red-500">{marketStatus.crypto}%</span>
-                  </button>
-                  <button className="w-full py-3 button-attack rounded flex justify-between items-center px-4">
-                    <span>Business</span>
-                    <span className="text-red-500">{marketStatus.business}%</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div className="game-card p-6 rounded-lg">
-                <h3 className="text-xl font-bold mb-4 text-center">OFFENSE</h3>
-                <p className="mb-4 text-gray-400 text-center">Launch strategic attacks to capture soldiers from opponents.</p>
-                <div className="space-y-3">
-                  <button className="w-full py-3 button-attack rounded px-4">Direct Attack</button>
-                  <button className="w-full py-3 button-attack rounded px-4">Market Manipulation</button>
-                  <button className="w-full py-3 button-attack rounded px-4">Deploy Spy</button>
-                </div>
-              </div>
-              
-              <div className="game-card p-6 rounded-lg">
-                <h3 className="text-xl font-bold mb-4 text-center">DEFENSE</h3>
-                <p className="mb-4 text-gray-400 text-center">Protect your wealth from enemy attacks and market volatility.</p>
-                <div className="space-y-3">
-                  <button className="w-full py-3 button-military rounded px-4">Build Defense Wall</button>
-                  <button className="w-full py-3 button-military rounded px-4">Market Insurance</button>
-                  <button className="w-full py-3 button-military rounded px-4">Counter-Intelligence</button>
-                </div>
-              </div>
-            </div>
+            {/* Player Actions Component */}
+            <PlayerActions
+              gameId="current-game"
+              playerId={currentUser?.uid}
+              currentWeek={2}
+              soldiers={165}
+            />
             
             {/* Game Board Visual */}
             <div 

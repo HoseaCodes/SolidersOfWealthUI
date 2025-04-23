@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { EconomicProvider } from './contexts/EconomicContext';
+import { EconomicProvider } from './components/admin/contexts/EconomicContext';
 import PrivateRoute from './components/auth/PrivateRoute';
 import LandingPage from './components/landing/LandingPage';
 import Login from './components/auth/Login';
@@ -9,7 +9,6 @@ import Signup from './components/auth/Signup';
 import Game from './components/game/Game';
 import CommandCenter from './components/game/CommandCenter';
 import Dashboard from './components/dashboard/Dashboard';
-import EconomicDashboard from './components/admin/EconomicDashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
 
 function App() {
@@ -39,11 +38,6 @@ function App() {
               <Route path="/admin" element={
                 <PrivateRoute>
                   <AdminDashboard />
-                </PrivateRoute>
-              } />
-              <Route path="/admin/economy" element={
-                <PrivateRoute>
-                  <EconomicDashboard />
                 </PrivateRoute>
               } />
               <Route path="*" element={<Navigate to="/" />} />

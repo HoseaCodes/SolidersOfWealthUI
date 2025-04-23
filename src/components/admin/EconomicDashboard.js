@@ -1,5 +1,5 @@
 import React from 'react';
-import { useEconomic } from '../../contexts/EconomicContext';
+import { useEconomic } from './contexts/EconomicContext';
 
 const EconomicDashboard = () => {
   const { 
@@ -14,7 +14,7 @@ const EconomicDashboard = () => {
     <div className="p-6 bg-gray-900 text-white">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Economic Simulation Dashboard</h2>
+          <h2 className="text-xl font-bold">Economic Simulation</h2>
           <div className="text-sm text-gray-400">
             Last Update: {new Date(economicState.lastUpdate).toLocaleString()}
           </div>
@@ -22,7 +22,7 @@ const EconomicDashboard = () => {
         
         {/* Economic Cycle Control */}
         <div className="mb-8 p-4 bg-gray-800 rounded-lg">
-          <h3 className="text-xl font-bold mb-4">Economic Cycle</h3>
+          <h3 className="text-lg font-semibold mb-4">Economic Cycle</h3>
           <div className="flex space-x-4 mb-4">
             {['boom', 'stable', 'downturn', 'crisis'].map(cycle => (
               <button
@@ -30,8 +30,8 @@ const EconomicDashboard = () => {
                 onClick={() => setCycle(cycle)}
                 className={`px-4 py-2 rounded-md capitalize ${
                   economicState.currentCycle === cycle
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
                 {cycle}
@@ -52,7 +52,7 @@ const EconomicDashboard = () => {
             </label>
             <button
               onClick={generateRandomEvent}
-              className="px-4 py-2 bg-green-600 rounded-md"
+              className="px-4 py-2 bg-green-600 rounded-md hover:bg-green-700"
             >
               Generate Random Event
             </button>
@@ -63,7 +63,7 @@ const EconomicDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {Object.entries(economicState.markets).map(([key, market]) => (
             <div key={key} className="p-4 bg-gray-800 rounded-lg">
-              <h4 className="text-lg font-bold mb-3">{market.name}</h4>
+              <h4 className="text-lg font-semibold mb-3">{market.name}</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span>Current Return:</span>
