@@ -379,7 +379,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
 
       <div className="flex justify-between items-center mt-8 bg-gray-800/50 p-4 rounded-lg border border-gray-700">
         <div className="soldier-counter px-4 py-2 rounded-lg flex items-center">
-          <img src="/soldierIcon.png" alt="Soldier Icon" className="h-8 w-8 mr-2" />
+          <img src="/images/soldier.png" alt="Soldier Icon" className="h-8 w-8 mr-2" />
           <div>
             <span className="text-sm text-gray-400">AVAILABLE FORCES</span>
             <div className="text-xl font-bold text-white">{soldiers} SOLDIERS</div>

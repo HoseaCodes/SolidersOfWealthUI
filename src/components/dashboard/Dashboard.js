@@ -8,7 +8,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import Modal from '../common/Modal';
 import Rulebook from '../game/Rulebook';
 import Training from '../game/Training';
-import Forum from '../game/Forum';
+import Forum from '../forum/Forum';
+// import Forum from '../game/Forum';
 import GameRules from '../game/GameRules';
 
 const Dashboard = () => {
