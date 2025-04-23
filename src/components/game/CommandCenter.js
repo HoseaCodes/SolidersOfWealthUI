@@ -1,297 +1,654 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import styled, { keyframes } from 'styled-components';
-import { useAuth } from '../../contexts/AuthContext';
-import GameLayout from './GameLayout';
-import { db } from '../../firebase';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import React, { useState } from 'react';
+import { FaBell, FaUserCircle } from 'react-icons/fa';
 
-const pulseAnimation = keyframes`
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-`;
+const CommandCenter = () => {
+  const [activeTab, setActiveTab] = useState('command');
+  const [notifications] = useState(3);
+  const [soldierInvestments, setSoldierInvestments] = useState({
+    stocks: 0,
+    realEstate: 0,
+    crypto: 0,
+    business: 0
+  });
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [attackSoldiers, setAttackSoldiers] = useState(50);
 
-const fadeInUp = keyframes`
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const AlertBanner = styled.div`
-  background: ${props => {
-    switch (props.state) {
-      case 'BOOM': return 'rgba(74, 93, 35, 0.9)';
-      case 'CRISIS': return 'rgba(193, 41, 46, 0.9)';
-      case 'DOWNTURN': return 'rgba(212, 175, 55, 0.3)';
-      default: return 'rgba(30, 61, 89, 0.9)';
+  const players = [
+    {
+      id: 'you',
+      name: 'YOU',
+      title: 'Commander Alpha',
+      soldiers: 100,
+      weeklySoldierIncome: 50,
+      actionsPerWeek: 3,
+      actionsRemaining: 3,
+      defense: 'Strong',
+      defenseLevel: 75,
+      investments: { stocks: 25, realEstate: 40, cash: 35 },
+      isYou: true
+    },
+    {
+      id: 'grace',
+      name: 'Grace Anderson',
+      title: 'Commander Echo',
+      soldiers: 100,
+      weeklySoldierIncome: 50,
+      actionsPerWeek: 3,
+      actionsRemaining: 3,
+      defense: 'Very Strong',
+      defenseLevel: 90,
+      alliance: 'ally',
+      investmentsHidden: true
+    },
+    {
+      id: 'romado',
+      name: 'Romado S.',
+      title: 'Commander Zulu',
+      soldiers: 100,
+      weeklySoldierIncome: 50,
+      actionsPerWeek: 3,
+      actionsRemaining: 3,
+      defense: 'Moderate',
+      defenseLevel: 45,
+      alliance: 'neutral',
+      investments: { crypto: 60, business: 20, cash: 20 }
+    },
+    {
+      id: 'charles',
+      name: 'Charles Nolen II',
+      title: 'Commander Delta',
+      soldiers: 100,
+      weeklySoldierIncome: 50,
+      actionsPerWeek: 3,
+      actionsRemaining: 3,
+      defense: 'Weak',
+      defenseLevel: 25,
+      alliance: 'enemy',
+      investments: { stocks: 70, realEstate: 10, cash: 20 }
     }
-  }};
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  animation: ${fadeInUp} 0.5s ease-out;
+  ];
 
-  h3 {
-    font-family: 'Black Ops One', cursive;
-    margin: 0 0 0.5rem 0;
-    color: #D4AF37;
-  }
+  const battlefieldTiles = [
+    { type: 'empty' }, { type: 'player', player: 'charles', soldiers: 25 }, { type: 'empty' }, { type: 'empty' }, { type: 'empty' },
+    { type: 'empty' }, { type: 'market', name: 'Crypto', change: '+20%', color: 'gold' }, { type: 'empty' }, { type: 'market', name: 'Finance', change: '-15%', color: 'blue' }, { type: 'empty' },
+    { type: 'empty' }, { type: 'player', player: 'you', soldiers: 50 }, { type: 'empty' }, { type: 'empty' }, { type: 'player', player: 'romado', soldiers: 45 },
+    { type: 'empty' }, { type: 'empty' }, { type: 'alliance', name: 'Alliance', desc: 'Opportunity' }, { type: 'empty' }, { type: 'empty' },
+    { type: 'empty' }, { type: 'empty' }, { type: 'empty' }, { type: 'player', player: 'grace', soldiers: 70 }, { type: 'empty' }
+  ];
 
-  p {
-    color: #A9B4C2;
-    margin: 0;
-  }
-`;
-
-const ActionGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
-`;
-
-const ActionCard = styled.div`
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 8px;
-  padding: 1.5rem;
-  border: 1px solid rgba(212, 175, 55, 0.2);
-  animation: ${fadeInUp} 0.5s ease-out;
-  animation-delay: ${props => props.delay || '0s'};
-  opacity: 0;
-  animation-fill-mode: forwards;
-
-  &:hover {
-    border-color: #D4AF37;
-  }
-
-  h3 {
-    font-family: 'Black Ops One', cursive;
-    color: #D4AF37;
-    margin: 0 0 1rem 0;
-  }
-`;
-
-const ActionButton = styled.button`
-  background: ${props => props.variant === 'attack' ? '#C1292E' : 
-               props.variant === 'invest' ? '#4A5D23' : 
-               'transparent'};
-  color: #D4AF37;
-  border: 2px solid ${props => props.variant === 'attack' ? '#C1292E' : 
-                              props.variant === 'invest' ? '#4A5D23' : 
-                              '#D4AF37'};
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  margin: 0.5rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  animation: ${props => props.pulse ? pulseAnimation : 'none'} 2s infinite;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const StatValue = styled.div`
-  font-family: monospace;
-  font-size: 1.2rem;
-  color: #D4AF37;
-  margin: 0.5rem 0;
-`;
-
-const economicStates = {
-  BOOM: {
-    description: "Markets are thriving! Increased returns on investments, but higher attack costs.",
-    effects: {
-      investmentMultiplier: 1.5,
-      attackCost: 1.3,
-      defenseCost: 1.0
-    }
-  },
-  STABLE: {
-    description: "Standard market conditions. Balanced costs and returns.",
-    effects: {
-      investmentMultiplier: 1.0,
-      attackCost: 1.0,
-      defenseCost: 1.0
-    }
-  },
-  DOWNTURN: {
-    description: "Market uncertainty. Reduced returns but cheaper attack costs.",
-    effects: {
-      investmentMultiplier: 0.7,
-      attackCost: 0.8,
-      defenseCost: 1.2
-    }
-  },
-  CRISIS: {
-    description: "Economic chaos! High-risk, high-reward environment.",
-    effects: {
-      investmentMultiplier: 0.5,
-      attackCost: 0.6,
-      defenseCost: 1.5
-    }
-  }
-};
-
-const investmentOptions = {
-  STOCKS: {
-    name: "Stock Market",
-    baseReturn: 0.15,
-    risk: 0.1,
-    minSoldiers: 10
-  },
-  REAL_ESTATE: {
-    name: "Real Estate",
-    baseReturn: 0.1,
-    risk: 0.05,
-    minSoldiers: 20
-  },
-  CRYPTO: {
-    name: "Cryptocurrency",
-    baseReturn: 0.25,
-    risk: 0.2,
-    minSoldiers: 15
-  },
-  BUSINESS: {
-    name: "Private Business",
-    baseReturn: 0.2,
-    risk: 0.15,
-    minSoldiers: 25
-  }
-};
-
-export default function CommandCenter() {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-  const [playerData, setPlayerData] = useState(null);
-  const [economicState, setEconomicState] = useState('STABLE');
-  const [selectedInvestment, setSelectedInvestment] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const unsubscribe = onSnapshot(doc(db, 'players', currentUser.uid), (doc) => {
-      if (doc.exists()) {
-        setPlayerData(doc.data());
-      }
-    });
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  useEffect(() => {
-    // Simulate random economic state changes
-    const interval = setInterval(() => {
-      const states = Object.keys(economicStates);
-      const newState = states[Math.floor(Math.random() * states.length)];
-      setEconomicState(newState);
-    }, 300000); // Change every 5 minutes
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const calculateReturn = (option) => {
-    const multiplier = economicStates[economicState].effects.investmentMultiplier;
-    const baseReturn = investmentOptions[option].baseReturn;
-    const risk = investmentOptions[option].risk;
-    const randomFactor = 1 + (Math.random() * risk * 2 - risk);
-    return baseReturn * multiplier * randomFactor;
+  const calculateSuccessChance = (attacker, defender) => {
+    const defenseRating = {
+      'Weak': 0.25,
+      'Moderate': 0.5,
+      'Strong': 0.75,
+      'Very Strong': 0.9
+    };
+    
+    const attackerStrength = attacker.soldiers;
+    const defenderDefense = defenseRating[defender.defense];
+    return Math.min(Math.round((attackerStrength / (defender.soldiers * defenderDefense)) * 100), 90);
   };
 
-  const handleInvest = async (option) => {
-    if (!playerData || loading) return;
+  const renderPlayerCard = (player) => (
+    <div key={player.id} className={`player-card p-4 rounded-lg ${player.isYou ? 'selected-player' : ''}`}>
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center">
+          <img src="/images/avatar.png" alt={`${player.name} Avatar`} className="h-10 w-10 rounded-full mr-3" />
+          <div>
+            {player.alliance ? (
+              <div className="flex items-center">
+                <span className={`alliance-indicator ${player.alliance}`}></span>
+                <h5 className="font-bold">{player.name}</h5>
+              </div>
+            ) : (
+              <h5 className="font-bold">{player.name}</h5>
+            )}
+            <p className="text-sm text-gray-400">{player.title}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-xl font-bold text-white">{player.soldiers}</span>
+          <p className="text-xs text-gray-400">SOLDIERS</p>
+        </div>
+      </div>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-gray-400">Defense:</span>
+        <span className="text-white">{player.defense}</span>
+      </div>
+      <div className="w-full bg-gray-700 h-2 rounded-full mb-3">
+        <div className={`h-2 ${player.defenseLevel >= 75 ? 'bg-green-600' : player.defenseLevel >= 50 ? 'bg-yellow-600' : 'bg-red-600'} rounded-full`} 
+             style={{ width: `${player.defenseLevel}%` }}></div>
+      </div>
+      {player.investmentsHidden ? (
+        <div className="text-xs text-center text-gray-500">
+          <span>Investment details hidden by defense wall</span>
+        </div>
+      ) : (
+        <div className="flex justify-between text-xs">
+          {Object.entries(player.investments).map(([key, value]) => (
+            <span key={key} className="text-gray-500">{key.charAt(0).toUpperCase() + key.slice(1)}: {value}%</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
-    const soldiers = playerData.soldiers;
-    const minRequired = investmentOptions[option].minSoldiers;
+  const renderBattlefieldTile = (tile, index) => (
+    <div key={index} className={`battlefield-tile ${tile.type === 'empty' ? 'hexagon-gray' : tile.type === 'market' ? `hexagon-${tile.color}` : ''}`}>
+      <div className="battlefield-tile-content">
+        {tile.type === 'empty' ? (
+          <span className="text-xs text-gray-500">Empty</span>
+        ) : tile.type === 'player' ? (
+          <div className="text-center">
+            <img src="/images/avatar.png" alt="Player Icon" className="h-8 w-8 mx-auto" />
+            <span className="text-xs">{players.find(p => p.id === tile.player)?.name}</span>
+            <div className="text-xs">{tile.soldiers} </div>
+          </div>
+        ) : tile.type === 'market' ? (
+          <div className="text-center">
+            <span className="text-xs">{tile.name}</span>
+            <div className="text-xs">{tile.change}</div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <span className="text-xs">{tile.name}</span>
+            <div className="text-xs">{tile.desc}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
-    if (soldiers < minRequired) {
-      alert(`Need at least ${minRequired} soldiers to invest in ${investmentOptions[option].name}`);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const returnRate = calculateReturn(option);
-      const soldiersGained = Math.floor(minRequired * returnRate);
+  const renderBattlefield = () => (
+    <div className="p-6">
+      {/* Economic Status Alert */}
+      <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+        <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+        <p className="text-gray-400">
+          Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+          Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+          Business {marketStatus.business}%
+        </p>
+      </div>
       
-      await updateDoc(doc(db, 'players', currentUser.uid), {
-        soldiers: soldiers - minRequired + soldiersGained,
-        investments: [...(playerData.investments || []), {
-          type: option,
-          amount: minRequired,
-          return: soldiersGained,
-          timestamp: new Date().toISOString()
-        }]
-      });
-    } catch (error) {
-      console.error('Investment error:', error);
-      alert('Failed to process investment');
-    } finally {
-      setLoading(false);
-    }
+      {/* Battlefield Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-2xl font-bold military-header">BATTLEFIELD MAP</h3>
+          <p className="text-gray-400">Strategic view of all commanders and their positions</p>
+        </div>
+        
+        <div className="flex space-x-3">
+          <button className="px-4 py-2 button-attack rounded">Attack</button>
+          <button className="px-4 py-2 button-finance rounded">Deploy Spy</button>
+          <button className="px-4 py-2 button-military rounded">Form Alliance</button>
+        </div>
+      </div>
+      
+      {/* Battlefield Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Players List */}
+        <div className="space-y-4">
+          <h4 className="font-bold text-lg mb-3 border-b border-gray-700 pb-2">COMMANDERS</h4>
+          {players.map(player => renderPlayerCard(player))}
+        </div>
+        
+        {/* Center: Battlefield Grid */}
+        <div className="col-span-2">
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <div className="battlefield-grid">
+              {battlefieldTiles.map((tile, index) => renderBattlefieldTile(tile, index))}
+            </div>
+            
+            {/* Legend */}
+            <div className="mt-6 flex flex-wrap justify-center space-x-4">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-green-700 mr-2"></div>
+                <span className="text-xs text-gray-400">Your Territory</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-red-700 mr-2"></div>
+                <span className="text-xs text-gray-400">Enemy</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-blue-700 mr-2"></div>
+                <span className="text-xs text-gray-400">Market</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-yellow-600 mr-2"></div>
+                <span className="text-xs text-gray-400">Special Event</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Panel */}
+          <div className="mt-6 bg-gray-800 p-4 rounded-lg">
+            <h4 className="font-bold mb-3 border-b border-gray-700 pb-2">BATTLEFIELD ACTIONS</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="game-card p-4 rounded-lg">
+                <h5 className="font-bold mb-2">DIRECT ATTACK</h5>
+                <p className="text-sm text-gray-400 mb-4">Launch an offensive to capture soldiers from another commander.</p>
+                
+                <div className="mb-3">
+                  <label className="text-sm block mb-1">Target Commander:</label>
+                  <select 
+                    className="battlefield-select"
+                    value={selectedPlayer}
+                    onChange={(e) => setSelectedPlayer(e.target.value)}
+                  >
+                    <option value="">Select a target</option>
+                    {players.filter(p => !p.isYou).map(player => (
+                      <option key={player.id} value={player.id}>
+                        {player.name} ({player.defense} Defense)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="text-sm block mb-1">Commit Soldiers: {attackSoldiers}</label>
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max="100" 
+                    value={attackSoldiers}
+                    onChange={(e) => setAttackSoldiers(parseInt(e.target.value))}
+                    className="battlefield-range w-full"
+                  />
+                </div>
+                
+                {selectedPlayer && (
+                  <div className="flex justify-between text-sm mb-4">
+                    <div>
+                      <span className="text-gray-400">Chance of Success:</span>
+                      <span className="text-green-500 ml-1">
+                        {calculateSuccessChance(
+                          players.find(p => p.isYou),
+                          players.find(p => p.id === selectedPlayer)
+                        )}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Potential Gain:</span>
+                      <span className="text-white ml-1">~{Math.round(attackSoldiers * 0.5)} Soldiers</span>
+                    </div>
+                  </div>
+                )}
+                
+                <button 
+                  className="w-full py-2 button-attack rounded"
+                  disabled={!selectedPlayer}
+                >
+                  Launch Attack
+                </button>
+              </div>
+              
+              <div className="game-card p-4 rounded-lg">
+                <h5 className="font-bold mb-2">DEPLOY SPY</h5>
+                <p className="text-sm text-gray-400 mb-4">Gather intelligence about enemy positions and investments.</p>
+                
+                <div className="mb-3">
+                  <label className="text-sm block mb-1">Target Commander:</label>
+                  <select className="battlefield-select">
+                    <option>Select a target</option>
+                    {players.filter(p => !p.isYou).map(player => (
+                      <option key={player.id}>{player.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Cost:</span>
+                    <span className="text-white">10 Soldiers</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Duration:</span>
+                    <span className="text-white">2 Turns</span>
+                  </div>
+                </div>
+                
+                <button className="w-full py-2 button-finance rounded">Deploy Spy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const tabClass = (tabName) => 
+    `px-6 py-3 ${activeTab === tabName ? 'tab-active' : 'tab-inactive'} transition-colors duration-200`;
+
+  const marketStatus = {
+    stocks: -15,
+    realEstate: -5,
+    crypto: -20,
+    business: -10
   };
+
+  const handleInvestmentChange = (market, value) => {
+    setSoldierInvestments(prev => ({
+      ...prev,
+      [market]: value
+    }));
+  };
+
+  const calculatePotentialReturn = (market, investment) => {
+    const rates = {
+      stocks: -0.15,
+      realEstate: -0.05,
+      crypto: -0.20,
+      business: -0.10
+    };
+    return Math.round(investment * rates[market]);
+  };
+
+  const renderMarketCard = (market, title, description, riskLevel, riskColor, riskPercentage) => (
+    <div className="market-card p-6 rounded-lg">
+      <div className="flex justify-between mb-4">
+        <h3 className="text-xl font-bold">{title}</h3>
+        <span className="px-3 py-1 bg-red-500 bg-opacity-30 text-red-400 rounded-md">
+          {marketStatus[market]}%
+        </span>
+      </div>
+      
+      <div className="mb-4">
+        <p className="text-gray-400 mb-2">{description}</p>
+        <div className="h-16 bg-gray-800 rounded-lg mb-1">
+          <img src={`/images/market-${market}.jpg`} alt={`${title} Chart`} className="h-16 w-full object-cover object-center rounded-lg" />
+        </div>
+      </div>
+      
+      <div className="mb-4">
+        <div className="flex justify-between mb-1">
+          <span className="text-sm text-gray-500">Risk Level</span>
+          <span className="text-sm text-gray-500">{riskLevel}</span>
+        </div>
+        <div className="h-2 bg-gray-700 rounded-full">
+          <div className={`h-2 bg-${riskColor}-500 rounded-full`} style={{ width: `${riskPercentage}%` }}></div>
+        </div>
+      </div>
+      
+      <div className="mb-6">
+        <div className="flex justify-between mb-1">
+          <span className="text-sm text-gray-500">Your Current Investment</span>
+          <span className="text-sm text-white">{soldierInvestments[market]} Soldiers</span>
+        </div>
+      </div>
+      
+      <div>
+        <div className="flex justify-between mb-2">
+          <span className="text-sm">Invest Soldiers:</span>
+          <span className="text-sm">{soldierInvestments[market]}</span>
+        </div>
+        <input 
+          type="range" 
+          min="0" 
+          max="165" 
+          value={soldierInvestments[market]} 
+          onChange={(e) => handleInvestmentChange(market, parseInt(e.target.value))}
+          className="w-full mb-4"
+        />
+        
+        <div className="flex justify-between">
+          <div>
+            <span className="text-sm text-gray-500">Potential Return:</span>
+            <span className="text-sm text-red-500 ml-1">
+              {calculatePotentialReturn(market, soldierInvestments[market])} Soldiers
+            </span>
+          </div>
+          
+          <button className="px-4 py-2 button-finance rounded">
+            Invest {soldierInvestments[market]} Soldiers
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMarketDashboard = () => (
+    <div className="p-6">
+      {/* Economic Status Alert */}
+      <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+        <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+        <p className="text-gray-400">
+          Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+          Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+          Business {marketStatus.business}%
+        </p>
+      </div>
+      
+      {/* Market Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {renderMarketCard(
+          'stocks',
+          'STOCK MARKET',
+          'High risk/reward with high economic sensitivity',
+          'High',
+          'red',
+          75
+        )}
+        {renderMarketCard(
+          'realEstate',
+          'REAL ESTATE',
+          'Medium risk/reward with moderate economic sensitivity',
+          'Medium',
+          'yellow',
+          50
+        )}
+        {renderMarketCard(
+          'crypto',
+          'CRYPTOCURRENCY',
+          'Very high risk/reward with extreme economic sensitivity',
+          'Very High',
+          'red',
+          90
+        )}
+        {renderMarketCard(
+          'business',
+          'BUSINESS',
+          'Low risk/reward with low economic sensitivity',
+          'Low',
+          'green',
+          25
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <GameLayout>
-      <AlertBanner state={economicState}>
-        <h3>ECONOMIC STATUS: {economicState}</h3>
-        <p>{economicStates[economicState].description}</p>
-      </AlertBanner>
-
-      <ActionGrid>
-        <ActionCard delay="0.2s">
-          <h3>INVESTMENT</h3>
-          <p>Deploy your soldiers across different markets</p>
-          {Object.entries(investmentOptions).map(([key, option]) => (
-            <div key={key}>
-              <ActionButton
-                variant="invest"
-                onClick={() => handleInvest(key)}
-                disabled={loading || !playerData || playerData.soldiers < option.minRequired}
-              >
-                {option.name} ({option.minSoldiers} soldiers)
-              </ActionButton>
-              <StatValue>
-                Est. Return: {(option.baseReturn * economicStates[economicState].effects.investmentMultiplier * 100).toFixed(1)}%
-              </StatValue>
+    <section id="command-center" className="p-6 mb-16">
+      <div className="max-w-6xl mx-auto bg-gray-900 rounded-lg overflow-hidden shadow-2xl">
+        {/* Top Navigation Bar */}
+        <nav className="bg-gray-800 px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <img src={"/logo.png"} alt="Logo" className="h-10 w-10 mr-3" />
+            <span className="text-xl font-bold text-white military-header">SOLDIERS OF WEALTH</span>
+          </div>
+          
+          <div className="flex items-center space-x-6">
+            <div className="soldier-counter px-4 py-2 rounded-lg flex items-center">
+              <img src={"/soldierIcon.png"} alt="Soldier Icon" className="h-8 w-8 mr-2" />
+              <span className="text-xl font-bold text-white">165 SOLDIERS</span>
             </div>
-          ))}
-        </ActionCard>
-
-        <ActionCard delay="0.4s">
-          <h3>OFFENSE</h3>
-          <p>Launch strategic attacks on your opponents</p>
-          <ActionButton
-            variant="attack"
-            onClick={() => navigate('/battlefield')}
+            
+            <div className="flex items-center text-gray-400">
+              <span className="mr-1">Week:</span>
+              <span className="text-white font-bold">2</span>
+              <span className="mx-1">/</span>
+              <span>4</span>
+            </div>
+            
+            <div className="text-gray-400">
+              <span>Moves Due: </span>
+              <span className="text-yellow-400 font-bold">23:59:42</span>
+            </div>
+            
+            <div className="relative">
+              <button className="relative">
+                <FaUserCircle className="h-10 w-10 text-gray-400" />
+                {notifications > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
+                    {notifications}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </nav>
+        
+        {/* Command Center Tabs */}
+        <div className="flex border-b border-gray-700">
+          <button 
+            className={tabClass('command')} 
+            onClick={() => setActiveTab('command')}
           >
-            Plan Attack
-          </ActionButton>
-        </ActionCard>
-
-        <ActionCard delay="0.6s">
-          <h3>DEFENSE</h3>
-          <p>Fortify your position against enemy attacks</p>
-          <ActionButton
-            onClick={() => navigate('/battlefield')}
+            Command Center
+          </button>
+          <button 
+            className={tabClass('market')} 
+            onClick={() => setActiveTab('market')}
           >
-            Deploy Defenses
-          </ActionButton>
-        </ActionCard>
-      </ActionGrid>
-    </GameLayout>
+            Market Dashboard
+          </button>
+          <button 
+            className={tabClass('battlefield')} 
+            onClick={() => setActiveTab('battlefield')}
+          >
+            Battlefield
+          </button>
+          <button 
+            className={tabClass('intelligence')} 
+            onClick={() => setActiveTab('intelligence')}
+          >
+            Intelligence
+          </button>
+        </div>
+        
+        {/* Main Content */}
+        {activeTab === 'market' ? renderMarketDashboard() : activeTab === 'battlefield' ? renderBattlefield() : (
+          <div className="p-6">
+            {/* Original Command Center Content */}
+            {/* Economic Status Alert */}
+            <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+              <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+              <p className="text-gray-400">
+                Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+                Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+                Business {marketStatus.business}%
+              </p>
+            </div>
+            
+            {/* Action Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="game-card p-6 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 text-center">INVESTMENT</h3>
+                <p className="mb-4 text-gray-400 text-center">Deploy your soldiers into markets to grow your wealth.</p>
+                <div className="space-y-3">
+                  <button className="w-full py-3 button-finance rounded flex justify-between items-center px-4">
+                    <span>Stocks</span>
+                    <span className="text-red-500">{marketStatus.stocks}%</span>
+                  </button>
+                  <button className="w-full py-3 button-military rounded flex justify-between items-center px-4">
+                    <span>Real Estate</span>
+                    <span className="text-red-500">{marketStatus.realEstate}%</span>
+                  </button>
+                  <button className="w-full py-3 button-gold rounded flex justify-between items-center px-4">
+                    <span>Cryptocurrency</span>
+                    <span className="text-red-500">{marketStatus.crypto}%</span>
+                  </button>
+                  <button className="w-full py-3 button-attack rounded flex justify-between items-center px-4">
+                    <span>Business</span>
+                    <span className="text-red-500">{marketStatus.business}%</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="game-card p-6 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 text-center">OFFENSE</h3>
+                <p className="mb-4 text-gray-400 text-center">Launch strategic attacks to capture soldiers from opponents.</p>
+                <div className="space-y-3">
+                  <button className="w-full py-3 button-attack rounded px-4">Direct Attack</button>
+                  <button className="w-full py-3 button-attack rounded px-4">Market Manipulation</button>
+                  <button className="w-full py-3 button-attack rounded px-4">Deploy Spy</button>
+                </div>
+              </div>
+              
+              <div className="game-card p-6 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 text-center">DEFENSE</h3>
+                <p className="mb-4 text-gray-400 text-center">Protect your wealth from enemy attacks and market volatility.</p>
+                <div className="space-y-3">
+                  <button className="w-full py-3 button-military rounded px-4">Build Defense Wall</button>
+                  <button className="w-full py-3 button-military rounded px-4">Market Insurance</button>
+                  <button className="w-full py-3 button-military rounded px-4">Counter-Intelligence</button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Game Board Visual */}
+            <div 
+              id="gameBoard" 
+              className="rounded-lg overflow-hidden mb-8 relative h-80 bg-cover bg-center group"
+              style={{
+                backgroundImage: 'url("/images/battlefield_preview.jpg")',
+                backgroundBlendMode: 'overlay',
+                backgroundColor: 'rgba(0, 0, 0, 0.4)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center h-full">
+                <div className="absolute top-4 left-4">
+                  <h3 className="text-2xl font-bold text-white military-header mb-2">ACTIVE BATTLEFIELD</h3>
+                  <p className="text-gray-300">12 Commanders in Battle</p>
+                </div>
+                <button className="px-8 py-4 bg-gray-900/80 text-white rounded-lg border-2 border-white hover:bg-gray-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-gold/20 group">
+                  <span className="text-lg font-bold military-header">VIEW FULL BATTLEFIELD</span>
+                  <div className="mt-1 text-sm text-gray-400 group-hover:text-gold transition-colors">Real-time battle updates available</div>
+                </button>
+                <div className="absolute bottom-4 right-4 flex items-center space-x-4">
+                  <div className="text-right">
+                    <div className="text-sm text-gray-400">Battle Ends In</div>
+                    <div className="text-xl font-bold text-gold">04:23:15</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Notifications & Updates */}
+            <div>
+              <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
+              <div className="space-y-4">
+                <div className="notification p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold">ATTACK ALERT</h4>
+                    <span className="text-sm text-gray-500">2 hours ago</span>
+                  </div>
+                  <p className="text-gray-400">Commander Eric has launched an attack against your forces. You lost 15 soldiers.</p>
+                </div>
+                
+                <div className="notification p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold">MARKET UPDATE</h4>
+                    <span className="text-sm text-gray-500">5 hours ago</span>
+                  </div>
+                  <p className="text-gray-400">Economic downturn has affected all markets. Your stock investments have lost value.</p>
+                </div>
+                
+                <div className="notification p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold">SPECIAL EVENT</h4>
+                    <span className="text-sm text-gray-500">1 day ago</span>
+                  </div>
+                  <p className="text-gray-400">Commander's Code Challenge is active! Post your leadership code on LinkedIn for bonus soldiers.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
-}
+};
+
+export default CommandCenter;

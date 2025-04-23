@@ -3,10 +3,30 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --military-green: #4A5D23;
+  --gold: #D4AF37;
+  --dark-blue: #1a2639;
+  --red: #C1292E;
+}
+
 @layer base {
   body {
     @apply bg-gray-900 text-gray-100;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--dark-blue);
+    color: white;
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+      monospace;
   }
 }
 
@@ -32,4 +52,573 @@
     background-position: 0 0, 10px 10px;
     background-size: 20px 20px;
   }
+
+  .military-header {
+    font-family: 'Black Ops One', cursive;
+    letter-spacing: 0.05em;
+  }
+
+  /* Command Center Styles */
+  .soldier-counter {
+    background: rgba(74, 93, 35, 0.3);
+    border: 2px solid var(--military-green);
+  }
+
+  .tab-active {
+    background-color: rgba(74, 93, 35, 0.2);
+    color: var(--gold);
+    border-bottom: 2px solid var(--gold);
+  }
+
+  .tab-inactive {
+    color: #9CA3AF;
+    border-bottom: 2px solid transparent;
+  }
+
+  .tab-inactive:hover {
+    color: white;
+    background-color: rgba(74, 93, 35, 0.1);
+  }
+
+  .economy-downturn {
+    background: rgba(193, 41, 46, 0.1);
+    border: 1px solid var(--red);
+  }
+
+  .game-card {
+    background: rgba(26, 38, 57, 0.5);
+    border: 1px solid var(--military-green);
+  }
+
+  .game-card:hover {
+    border-color: var(--gold);
+  }
+
+  /* Game Board */
+  #gameBoard {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  #gameBoard::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, 
+      rgba(0,0,0,0.2) 0%,
+      rgba(0,0,0,0.3) 50%,
+      rgba(0,0,0,0.7) 100%
+    );
+    z-index: 1;
+    transition: opacity 0.3s ease;
+  }
+
+  #gameBoard:hover::before {
+    opacity: 0.8;
+  }
+
+  #gameBoard > * {
+    z-index: 2;
+    position: relative;
+  }
+
+  .text-gold {
+    color: var(--gold);
+  }
+
+  .shadow-gold {
+    --tw-shadow-color: var(--gold);
+  }
+
+  /* Button Styles */
+  .button-finance {
+    background: rgba(74, 93, 35, 0.2);
+    border: 1px solid var(--military-green);
+    color: white;
+  }
+
+  .button-military {
+    background: rgba(74, 93, 35, 0.2);
+    border: 1px solid var(--military-green);
+    color: white;
+  }
+
+  .button-gold {
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid var(--gold);
+    color: white;
+  }
+
+  .button-attack {
+    background: rgba(193, 41, 46, 0.2);
+    border: 1px solid var(--red);
+    color: white;
+  }
+
+  .button-finance:hover,
+  .button-military:hover,
+  .button-gold:hover,
+  .button-attack:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.2);
+  }
+
+  .notification {
+    background: rgba(26, 38, 57, 0.5);
+    border: 1px solid var(--military-green);
+  }
+
+  .notification:hover {
+    border-color: var(--gold);
+  }
+
+  /* Market Cards */
+  .market-card {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    transition: all 0.3s ease;
+  }
+
+  .market-card:hover {
+    border-color: var(--gold);
+    box-shadow: 0 4px 20px rgba(234, 179, 8, 0.1);
+  }
+
+  .market-card input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .market-card input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .market-card input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
+  }
+
+  .market-card input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--gold);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .market-card input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
+  }
+
+  /* Battlefield Styles */
+  .battlefield-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .battlefield-tile {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    background-color: rgba(44, 62, 80, 0.5);
+    border: 1px solid var(--military-green);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+
+  .battlefield-tile:hover {
+    transform: scale(1.05);
+    border-color: var(--gold);
+    z-index: 10;
+  }
+
+  .battlefield-tile-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px;
+  }
+
+  .alliance-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+  .ally { background-color: var(--military-green); }
+  .neutral { background-color: #A9B4C2; }
+  .enemy { background-color: var(--red); }
+
+  .hexagon-gray { background-color: rgba(169, 180, 194, 0.1); }
+  .hexagon-red { background-color: rgba(193, 41, 46, 0.2); }
+  .hexagon-blue { background-color: rgba(30, 61, 89, 0.2); }
+  .hexagon-gold { background-color: rgba(212, 175, 55, 0.2); }
+
+  .player-card {
+    background-color: rgba(44, 62, 80, 0.5);
+    border: 1px solid var(--military-green);
+    transition: all 0.3s ease;
+  }
+
+  .player-card:hover {
+    transform: scale(1.02);
+  }
+
+  .selected-player {
+    border: 2px solid var(--gold);
+    background-color: rgba(44, 62, 80, 0.8);
+  }
+
+  /* Custom Range Input for Battlefield */
+  .battlefield-range {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(74, 93, 35, 0.2);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .battlefield-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--military-green);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .battlefield-range::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: var(--gold);
+  }
+
+  .battlefield-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--military-green);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .battlefield-range::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    background: var(--gold);
+  }
+
+  /* Custom Select for Battlefield */
+  .battlefield-select {
+    background-color: rgba(44, 62, 80, 0.5);
+    border: 1px solid var(--military-green);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    width: 100%;
+    outline: none;
+    transition: all 0.3s ease;
+  }
+
+  .battlefield-select:hover {
+    border-color: var(--gold);
+  }
+
+  .battlefield-select option {
+    background-color: #1a2639;
+    color: white;
+  }
+}
+
+/* Global Styles */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1a1a1a;
+  color: white;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Command Center Styles */
+.command-center {
+  background-color: #121212;
+  min-height: 100vh;
+}
+
+.header {
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.tab-active {
+  background-color: #2d2d2d;
+  color: white;
+  border-bottom: 2px solid #4a9eff;
+}
+
+.tab-inactive {
+  color: #808080;
+}
+
+.tab-inactive:hover {
+  background-color: #252525;
+  color: #a0a0a0;
+}
+
+.notification-badge {
+  background-color: #dc2626;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+}
+
+/* Market Dashboard Styles */
+.market-card {
+  background-color: #1e1e1e;
+  border: 1px solid #2d2d2d;
+}
+
+.market-card:hover {
+  border-color: #4a9eff;
+}
+
+.market-positive {
+  color: #34d399;
+}
+
+.market-negative {
+  color: #f87171;
+}
+
+.investment-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #4b5563;
+  border-radius: 2px;
+  outline: none;
+}
+
+.investment-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4a9eff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.investment-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #4a9eff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Battlefield Styles */
+.battlefield-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.battlefield-tile {
+  aspect-ratio: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #2d2d2d;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.battlefield-tile:hover {
+  transform: scale(1.05);
+}
+
+.battlefield-tile-content {
+  z-index: 1;
+  text-align: center;
+}
+
+.hexagon-gray {
+  background-color: #2d2d2d;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.hexagon-gold {
+  background-color: #b7791f;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.hexagon-blue {
+  background-color: #2563eb;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.player-card {
+  background-color: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  transition: all 0.2s;
+}
+
+.player-card:hover {
+  border-color: #4a9eff;
+  transform: translateY(-2px);
+}
+
+.selected-player {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 1px #4a9eff;
+}
+
+.alliance-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.alliance-indicator.ally {
+  background-color: #34d399;
+}
+
+.alliance-indicator.enemy {
+  background-color: #f87171;
+}
+
+.alliance-indicator.neutral {
+  background-color: #fbbf24;
+}
+
+.game-card {
+  background-color: #1e1e1e;
+  border: 1px solid #2d2d2d;
+}
+
+.button-attack {
+  background-color: #991b1b;
+  color: white;
+  transition: all 0.2s;
+}
+
+.button-attack:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.button-attack:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-finance {
+  background-color: #065f46;
+  color: white;
+  transition: all 0.2s;
+}
+
+.button-finance:hover {
+  background-color: #059669;
+}
+
+.button-military {
+  background-color: #1e40af;
+  color: white;
+  transition: all 0.2s;
+}
+
+.button-military:hover {
+  background-color: #2563eb;
+}
+
+.battlefield-select {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: #2d2d2d;
+  color: white;
+  border: 1px solid #4b5563;
+  border-radius: 0.375rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+}
+
+.battlefield-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #4b5563;
+  border-radius: 2px;
+  outline: none;
+}
+
+.battlefield-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #dc2626;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.battlefield-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #dc2626;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.economy-downturn {
+  background-color: #991b1b;
+  border: 1px solid #dc2626;
+}
+
+.military-header {
+  font-family: 'Orbitron', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }

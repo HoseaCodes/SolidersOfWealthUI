@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import styled from 'styled-components';
 import { FcGoogle } from 'react-icons/fc';
 
@@ -83,10 +84,64 @@ const LoginLink = styled(Link)`
   }
 `;
 
+const db = getFirestore();
+
+const generateTitle = () => {
+  const titles = [
+    'Commander Alpha',
+    'Commander Bravo',
+    'Commander Delta',
+    'Commander Echo',
+    'Commander Fox',
+    'Commander Zulu'
+  ];
+  return titles[Math.floor(Math.random() * titles.length)];
+};
+
+const generateDefense = () => {
+  const defenses = [
+    { level: 'Strong', value: 75 },
+    { level: 'Moderate', value: 50 },
+    { level: 'Weak', value: 25 }
+  ];
+  return defenses[Math.floor(Math.random() * defenses.length)];
+};
+
+const createInitialPlayerProfile = async (userId, name) => {
+  const defense = generateDefense();
+  const playerData = {
+    id: userId,
+    name: name,
+    title: generateTitle(),
+    soldiers: 100,
+    weeklySoldierIncome: 50,
+    actionsPerWeek: 3,
+    actionsRemaining: 3,
+    defense: defense.level,
+    defenseLevel: defense.value,
+    investments: { 
+      stocks: 0, 
+      realEstate: 0, 
+      cash: 100  // Start with all money in cash
+    },
+    isYou: true,
+    createdAt: new Date().toISOString(),
+    lastUpdated: new Date().toISOString()
+  };
+
+  try {
+    await setDoc(doc(db, 'players', userId), playerData);
+  } catch (error) {
+    console.error('Error creating player profile:', error);
+    throw new Error('Failed to create player profile');
+  }
+};
+
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
@@ -102,12 +157,17 @@ export default function Signup() {
     try {
       setError('');
       setLoading(true);
-      await signup(email, password)
-        .then(() => {
-          navigate('/dashboard');
-        });
+      
+      // Create auth user
+      const userCredential = await signup(email, password);
+      
+      // Create player profile
+      await createInitialPlayerProfile(userCredential.user.uid, name);
+      
+      // Navigate to game
+      navigate('/dashboard');
     } catch (error) {
-      setError('Failed to create an account. ' + error.message);
+      setError('Failed to create an account: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -118,6 +178,14 @@ export default function Signup() {
       <Form onSubmit={handleSubmit}>
         <Title>JOIN THE BATTLE</Title>
         {error && <Error>{error}</Error>}
+        
+        <Input
+          type="text"
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
         
         <Input
           type="email"
