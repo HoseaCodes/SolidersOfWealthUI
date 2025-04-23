@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { useAdmin } from '../../hooks/useAdmin';
 
 const GameManagement = () => {
+  const [loading, setLoading] = useState(true);
   const [games, setGames] = useState([]);
   const [pastGames, setPastGames] = useState([]);
   const [players, setPlayers] = useState([]);
@@ -30,8 +33,26 @@ const GameManagement = () => {
     image: '',
     status: 'completed'
   });
-  
+
+  const { isAdmin, loading: adminLoading } = useAdmin();
+  const navigate = useNavigate();
   const db = getFirestore();
+
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) {
+      navigate('/dashboard');
+    }
+  }, [adminLoading, isAdmin, navigate]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (isAdmin) {
+        await Promise.all([loadGames(), loadPlayers()]);
+        setLoading(false);
+      }
+    };
+    init();
+  }, [isAdmin]);
 
   const difficultyOptions = [
     { name: 'Beginner', level: 1 },
@@ -39,11 +60,6 @@ const GameManagement = () => {
     { name: 'Advanced', level: 3 },
     { name: 'Expert', level: 4 }
   ];
-
-  useEffect(() => {
-    loadGames();
-    loadPlayers();
-  }, []);
 
   const loadPlayers = async () => {
     try {
@@ -215,6 +231,24 @@ const GameManagement = () => {
       }
     }
   };
+
+  if (loading || adminLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="text-red-500 text-xl font-bold">
+          ACCESS DENIED: Administrator privileges required.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

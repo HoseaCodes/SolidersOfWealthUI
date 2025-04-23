@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import { EconomicProvider } from './components/admin/contexts/EconomicContext';
 import PrivateRoute from './components/auth/PrivateRoute';
+import AdminRoute from './components/auth/AdminRoute';
 import LandingPage from './components/landing/LandingPage';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
@@ -42,9 +43,9 @@ function App() {
                 </PrivateRoute>
               } />
               <Route path="/admin" element={
-                <PrivateRoute>
+                <AdminRoute>
                   <AdminDashboard />
-                </PrivateRoute>
+                </AdminRoute>
               } />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
