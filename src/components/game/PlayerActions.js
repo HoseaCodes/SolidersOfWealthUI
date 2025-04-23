@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
-const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
+const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit, onViewMarket }) => {
   const [selectedActions, setSelectedActions] = useState({
     investment: null,
     offensive: null,
@@ -70,10 +70,23 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
         ...prev,
         [category]: ''
       }));
+      if (category === 'investment') {
+        onActionSubmit(null); // Clear current deployment display
+      }
     }
 
     if (category === 'investment') {
       setInvestmentAmount(10);
+      // If selecting invest action, update display with current amount
+      if (action.id === 'invest') {
+        onActionSubmit({
+          investment: {
+            type: 'invest',
+            amount: 10, // Default amount
+            market: selectedMarkets[category] // Keep current market if exists
+          }
+        });
+      }
     }
   };
 
@@ -82,6 +95,33 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
       ...prev,
       [category]: market
     }));
+    
+    // Notify parent of investment selection
+    if (category === 'investment' && selectedActions[category]?.id === 'invest') {
+      onActionSubmit({
+        investment: {
+          type: 'invest',
+          amount: investmentAmount,
+          market: market
+        }
+      });
+    }
+  };
+
+  const handleInvestmentAmountChange = (amount) => {
+    const newAmount = parseInt(amount) || 0;
+    setInvestmentAmount(newAmount);
+    
+    // Update deployment display with new amount
+    if (selectedActions.investment?.id === 'invest' && selectedMarkets.investment) {
+      onActionSubmit({
+        investment: {
+          type: 'invest',
+          amount: newAmount,
+          market: selectedMarkets.investment
+        }
+      });
+    }
   };
 
   const validateActions = () => {
@@ -150,6 +190,11 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
 
       await addDoc(collection(db, 'playerActions'), actionData);
       
+      // Notify parent component of the action
+      if (onActionSubmit) {
+        onActionSubmit(actionData);
+      }
+      
       setSelectedActions({
         investment: null,
         offensive: null,
@@ -181,6 +226,14 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
           </div>
         )}
       </div>
+      {category === 'investment' && (
+        <button 
+          onClick={() => onViewMarket()}
+          className="inline-block mb-4 px-4 py-2 bg-gray-700/50 hover:bg-gray-600/50 rounded border border-gray-600 text-sm transition-all duration-300"
+        >
+          VIEW MARKET DASHBOARD →
+        </button>
+      )}
       <p className="mb-4 text-gray-400 text-sm">
         {category === 'investment' 
           ? 'Deploy your soldiers strategically to maximize resource gains.'
@@ -236,7 +289,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers }) => {
                   min="10"
                   max={soldiers}
                   value={investmentAmount}
-                  onChange={(e) => setInvestmentAmount(parseInt(e.target.value) || 0)}
+                  onChange={(e) => handleInvestmentAmountChange(e.target.value)}
                   className="bg-gray-800 p-2 rounded w-24 border border-gray-600 text-center font-bold"
                 />
               </div>

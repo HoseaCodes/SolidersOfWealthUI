@@ -6,6 +6,9 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const CommandCenter = () => {
   const [activeTab, setActiveTab] = useState('command');
+  const [currentWeek, setCurrentWeek] = useState(1);
+  const [soldiers, setSoldiers] = useState(165);
+  const [currentAction, setCurrentAction] = useState(null);
   const [notifications] = useState(3);
   const [soldierInvestments, setSoldierInvestments] = useState({
     stocks: 0,
@@ -145,7 +148,7 @@ const CommandCenter = () => {
           <span className="text-xs text-gray-500">Empty</span>
         ) : tile.type === 'player' ? (
           <div className="text-center">
-            <img src="/images/avatar.png" alt="Player Icon" className="h-8 w-8 mx-auto" />
+            <img src="/images/avatar.png" alt="Player Icon" className="h-20 w-20 mx-auto" />
             <span className="text-xs">{players.find(p => p.id === tile.player)?.name}</span>
             <div className="text-xs">{tile.soldiers} </div>
           </div>
@@ -333,6 +336,16 @@ const CommandCenter = () => {
     business: -10
   };
 
+  const calculatePotentialReturn = (market, investment) => {
+    const rates = {
+      stocks: (100 + marketStatus.stocks) / 100,
+      realEstate: (100 + marketStatus.realEstate) / 100,
+      crypto: (100 + marketStatus.crypto) / 100,
+      business: (100 + marketStatus.business) / 100
+    };
+    return Math.round(investment * rates[market]);
+  };
+
   const handleInvestmentChange = (market, value) => {
     setSoldierInvestments(prev => ({
       ...prev,
@@ -340,128 +353,207 @@ const CommandCenter = () => {
     }));
   };
 
-  const calculatePotentialReturn = (market, investment) => {
-    const rates = {
-      stocks: -0.15,
-      realEstate: -0.05,
-      crypto: -0.20,
-      business: -0.10
-    };
-    return Math.round(investment * rates[market]);
+  const handleMarketInvestment = (market, amount) => {
+    setCurrentAction({
+      investment: {
+        type: 'invest',
+        amount: amount,
+        market: market
+      }
+    });
+    setActiveTab('command'); // Switch back to command tab after investment
   };
 
-  const renderMarketCard = (market, title, description, riskLevel, riskColor, riskPercentage) => (
-    <div className="market-card p-6 rounded-lg">
-      <div className="flex justify-between mb-4">
-        <h3 className="text-xl font-bold">{title}</h3>
-        <span className="px-3 py-1 bg-red-500 bg-opacity-30 text-red-400 rounded-md">
-          {marketStatus[market]}%
-        </span>
-      </div>
-      
-      <div className="mb-4">
-        <p className="text-gray-400 mb-2">{description}</p>
-        <div className="h-16 bg-gray-800 rounded-lg mb-1">
-          <img src={`/images/market-${market}.jpg`} alt={`${title} Chart`} className="h-16 w-full object-cover object-center rounded-lg" />
-        </div>
-      </div>
-      
-      <div className="mb-4">
-        <div className="flex justify-between mb-1">
-          <span className="text-sm text-gray-500">Risk Level</span>
-          <span className="text-sm text-gray-500">{riskLevel}</span>
-        </div>
-        <div className="h-2 bg-gray-700 rounded-full">
-          <div className={`h-2 bg-${riskColor}-500 rounded-full`} style={{ width: `${riskPercentage}%` }}></div>
-        </div>
-      </div>
-      
-      <div className="mb-6">
-        <div className="flex justify-between mb-1">
-          <span className="text-sm text-gray-500">Your Current Investment</span>
-          <span className="text-sm text-white">{soldierInvestments[market]} Soldiers</span>
-        </div>
-      </div>
-      
-      <div>
-        <div className="flex justify-between mb-2">
-          <span className="text-sm">Invest Soldiers:</span>
-          <span className="text-sm">{soldierInvestments[market]}</span>
-        </div>
-        <input 
-          type="range" 
-          min="0" 
-          max="165" 
-          value={soldierInvestments[market]} 
-          onChange={(e) => handleInvestmentChange(market, parseInt(e.target.value))}
-          className="w-full mb-4"
-        />
-        
-        <div className="flex justify-between">
-          <div>
-            <span className="text-sm text-gray-500">Potential Return:</span>
-            <span className="text-sm text-red-500 ml-1">
-              {calculatePotentialReturn(market, soldierInvestments[market])} Soldiers
-            </span>
-          </div>
-          
-          <button className="px-4 py-2 button-finance rounded">
-            Invest {soldierInvestments[market]} Soldiers
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const renderMarketDashboard = () => {
+    const markets = [
+      { 
+        id: 'stocks', 
+        name: 'STOCK MARKET', 
+        status: marketStatus.stocks, 
+        buttonClass: 'button-finance',
+        description: 'High risk/reward with high economic sensitivity',
+        riskLevel: 'High',
+        riskColor: 'red',
+        riskPercentage: 75
+      },
+      { 
+        id: 'realEstate', 
+        name: 'REAL ESTATE', 
+        status: marketStatus.realEstate, 
+        buttonClass: 'button-military',
+        description: 'Medium risk/reward with moderate economic sensitivity',
+        riskLevel: 'Medium',
+        riskColor: 'yellow',
+        riskPercentage: 50
+      },
+      { 
+        id: 'crypto', 
+        name: 'CRYPTOCURRENCY', 
+        status: marketStatus.crypto, 
+        buttonClass: 'button-gold',
+        description: 'Very high risk/reward with extreme economic sensitivity',
+        riskLevel: 'Very High',
+        riskColor: 'red',
+        riskPercentage: 90
+      },
+      { 
+        id: 'business', 
+        name: 'BUSINESS', 
+        status: marketStatus.business, 
+        buttonClass: 'button-attack',
+        description: 'Low risk/reward with low economic sensitivity',
+        riskLevel: 'Low',
+        riskColor: 'green',
+        riskPercentage: 25
+      }
+    ];
 
-  const renderMarketDashboard = () => (
-    <div className="p-6">
-      {/* Economic Status Alert */}
-      <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
-        <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
-        <p className="text-gray-400">
-          Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
-          Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
-          Business {marketStatus.business}%
-        </p>
+    return (
+      <div className="space-y-6">
+        {/* Economic Status Alert */}
+        <div className="economy-downturn px-6 py-4 rounded-lg">
+          <h3 className="text-xl font-bold military-header mb-1">ECONOMIC STATUS REPORT</h3>
+          <p className="text-gray-400">
+            Market Intelligence: Stocks {marketStatus.stocks}%, 
+            Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+            Business {marketStatus.business}%
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {markets.map(market => (
+            <div key={market.id} className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold military-header">{market.name}</h3>
+                <div className="px-3 py-1 rounded bg-gray-700/50 text-sm">
+                  <span className={market.status >= 0 ? 'text-green-500' : 'text-red-500'}>
+                    {market.status}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="text-gray-400 text-sm">
+                  {market.description}
+                </div>
+
+                {/* Risk Level Indicator */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm text-gray-400">RISK ASSESSMENT</span>
+                    <span className="text-sm text-gray-400">{market.riskLevel}</span>
+                  </div>
+                  <div className="h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className={`h-2 bg-${market.riskColor}-500 rounded-full transition-all duration-300`} 
+                      style={{ width: `${market.riskPercentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Current Investment */}
+                <div className="soldier-counter px-4 py-2 rounded-lg bg-gray-700/30 border border-gray-600">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">CURRENT DEPLOYMENT</span>
+                    <span className="font-bold">{soldierInvestments[market.id]} SOLDIERS</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm text-gray-400">POTENTIAL RETURN</span>
+                    <span className={market.status >= 0 ? 'text-green-500' : 'text-red-500'}>
+                      {calculatePotentialReturn(market.id, soldierInvestments[market.id])} SOLDIERS
+                    </span>
+                  </div>
+                </div>
+
+                {/* Investment Controls */}
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="number"
+                    min="10"
+                    max={soldiers}
+                    defaultValue={10}
+                    className="bg-gray-800 p-2 rounded w-24 border border-gray-600 text-center font-bold"
+                    id={`invest-${market.id}`}
+                  />
+                  <button
+                    onClick={() => {
+                      const amount = parseInt(document.getElementById(`invest-${market.id}`).value) || 0;
+                      if (amount >= 10 && amount <= soldiers) {
+                        handleMarketInvestment(market.id, amount);
+                      }
+                    }}
+                    className={`flex-1 py-3 ${market.buttonClass} rounded px-4 transition-all duration-300 hover:scale-105`}
+                  >
+                    DEPLOY {document.getElementById(`invest-${market.id}`)?.value || 10} SOLDIERS
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => setActiveTab('command')}
+          className="w-full py-3 bg-gray-700/50 hover:bg-gray-600/50 rounded px-4 transition-all duration-300"
+        >
+          RETURN TO COMMAND CENTER
+        </button>
       </div>
-      
-      {/* Market Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {renderMarketCard(
-          'stocks',
-          'STOCK MARKET',
-          'High risk/reward with high economic sensitivity',
-          'High',
-          'red',
-          75
-        )}
-        {renderMarketCard(
-          'realEstate',
-          'REAL ESTATE',
-          'Medium risk/reward with moderate economic sensitivity',
-          'Medium',
-          'yellow',
-          50
-        )}
-        {renderMarketCard(
-          'crypto',
-          'CRYPTOCURRENCY',
-          'Very high risk/reward with extreme economic sensitivity',
-          'Very High',
-          'red',
-          90
-        )}
-        {renderMarketCard(
-          'business',
-          'BUSINESS',
-          'Low risk/reward with low economic sensitivity',
-          'Low',
-          'green',
-          25
-        )}
+    );
+  };
+
+  const handleActionSubmit = (actionData) => {
+    // Only update if we have valid action data
+    if (actionData === null) {
+      setCurrentAction(null);
+      return;
+    }
+    
+    // Validate soldier amount
+    if (actionData.investment?.amount > soldiers) {
+      return; // Don't update if amount exceeds available soldiers
+    }
+    
+    setCurrentAction(actionData);
+  };
+
+  const handleViewMarket = () => {
+    setActiveTab('market');
+  };
+
+  const renderCurrentAction = () => {
+    if (!currentAction?.investment) return null;
+
+    const { type, amount, market } = currentAction.investment;
+    if (type !== 'invest' || !market) return null;
+
+    const marketDisplay = {
+      stocks: 'STOCK MARKET',
+      realEstate: 'REAL ESTATE',
+      crypto: 'CRYPTOCURRENCY',
+      business: 'BUSINESS'
+    };
+
+    return (
+      <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
+        <h3 className="text-xl font-bold military-header mb-4">STRATEGIC DEPLOYMENT</h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-gray-400 text-sm mb-1">CURRENT DEPLOYMENT</div>
+            <div className="font-bold">{marketDisplay[market] || market.toUpperCase()}</div>
+          </div>
+          <div>
+            <div className="text-gray-400 text-sm mb-1">DEPLOYED FORCES</div>
+            <div className="font-bold">{amount} SOLDIERS</div>
+          </div>
+          <div>
+            <div className="text-gray-400 text-sm mb-1">REMAINING FORCES</div>
+            <div className="font-bold">{soldiers - amount} SOLDIERS</div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <section id="command-center" className="p-6 mb-16">
@@ -546,12 +638,15 @@ const CommandCenter = () => {
               </p>
             </div>
             
-            {/* Player Actions Component */}
-            <PlayerActions
+            {renderCurrentAction()}
+            
+            <PlayerActions 
               gameId="current-game"
               playerId={currentUser?.uid}
-              currentWeek={2}
-              soldiers={165}
+              currentWeek={currentWeek}
+              soldiers={soldiers}
+              onActionSubmit={handleActionSubmit}
+              onViewMarket={handleViewMarket}
             />
             
             {/* Game Board Visual */}
@@ -566,7 +661,7 @@ const CommandCenter = () => {
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center h-full">
                 <div className="absolute top-4 left-4">
-                  <h3 className="text-2xl font-bold text-white military-header mb-2">ACTIVE BATTLEFIELD</h3>
+                  <h3 className="text-2xl font-bold military-header mb-2">ACTIVE BATTLEFIELD</h3>
                   <p className="text-gray-300">12 Commanders in Battle</p>
                 </div>
                 <button className="px-8 py-4 bg-gray-900/80 text-white rounded-lg border-2 border-white hover:bg-gray-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-gold/20 group">
