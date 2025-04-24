@@ -12,6 +12,8 @@ import CommandCenter from './components/game/CommandCenter';
 import Dashboard from './components/dashboard/Dashboard';
 import AdminDashboard from './components/admin/AdminDashboard';
 import Profile from './components/profile/Profile';
+import TrainingLibrary from './components/training/TrainingLibrary';
+import TrainingAdmin from './components/training/TrainingAdmin';
 
 function App() {
   return (
@@ -41,6 +43,16 @@ function App() {
                 <PrivateRoute>
                   <Profile />
                 </PrivateRoute>
+              } />
+              <Route path="/training" element={
+                <PrivateRoute>
+                  <TrainingLibrary />
+                </PrivateRoute>
+              } />
+              <Route path="/admin/training" element={
+                <AdminRoute>
+                  <TrainingAdmin />
+                </AdminRoute>
               } />
               <Route path="/admin" element={
                 <AdminRoute>

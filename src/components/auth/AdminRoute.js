@@ -3,7 +3,8 @@ import { Navigate } from 'react-router-dom';
 import { useAdmin } from '../../hooks/useAdmin';
 
 const AdminRoute = ({ children }) => {
-  const { isAdmin, loading } = useAdmin();
+  const { isAdmin, allAdmins, loading } = useAdmin();
+  console.log('AdminRoute', { isAdmin, allAdmins, loading });
 
   if (loading) {
     return (
