@@ -11,6 +11,7 @@ import Training from '../training/Training';
 import Forum from '../forum/Forum';
 // import Forum from '../game/Forum';
 import GameRules from '../game/GameRules';
+import Navbar from './Navbar';
 
 const Dashboard = () => {
   const [upcomingGames, setUpcomingGames] = useState([]);
@@ -298,22 +299,7 @@ const Dashboard = () => {
       <section className="p-6 min-h-screen bg-[#1a2639]">
         <div className="max-w-6xl mx-auto bg-gray-900 rounded-lg overflow-hidden shadow-2xl border-2 border-[#4A5D23] hover:border-[#D4AF37] transition-all">
           {/* Top Navigation Bar */}
-          <nav className="bg-gray-800 px-6 py-4 flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="text-xl font-bold text-white font-impact uppercase tracking-wider">SOLDIERS OF WEALTH</span>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <button onClick={() => setShowRules(true)} className="text-gray-300 hover:text-white">Game Rules</button>
-              <button onClick={() => setShowComingSoon(true)} className="text-gray-300 hover:text-white">FAQ</button>
-              <button onClick={() => setShowComingSoon(true)} className="text-gray-300 hover:text-white">Leaderboard</button>
-              <Link to="/profile" className="relative">
-                <button className="flex items-center space-x-2">
-                  <span className="text-white">{currentUser.email}</span>
-                </button>
-              </Link>
-            </div>
-          </nav>
+          <Navbar />
 
           {/* Main Content */}
           <div className="p-6">
@@ -466,7 +452,7 @@ const Dashboard = () => {
               {/* Onboarding Progress */}
               <div className="mb-8">
                 <h2 className="text-2xl font-bold mb-4 font-impact uppercase tracking-wider">COMMANDER ONBOARDING</h2>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   <div className="bg-[#4A5D23] p-3 rounded-md text-center">
                     <div className="h-10 w-10 rounded-full bg-white text-green-800 flex items-center justify-center mx-auto mb-2 font-bold text-lg">✓</div>
                     <p className="font-bold">Create Account</p>
@@ -519,8 +505,8 @@ const Dashboard = () => {
                           <span className="text-xs text-gray-400">{game.commandersEnlisted} Commanders Enlisted</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center">
+                      <div className="flex items-center justify-between mt-4 flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center flex-wrap sm:flex-nowrap">
                           <span className="text-sm text-gray-300 mr-3">Difficulty:</span>
                           <div className="flex space-x-1">
                             {[...Array(5)].map((_, i) => (

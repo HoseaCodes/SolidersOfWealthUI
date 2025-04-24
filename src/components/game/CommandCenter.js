@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaBell, FaUserCircle } from 'react-icons/fa';
 import PlayerActions from './PlayerActions';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import ResponsiveNavbar from './Navbar';
 
 const CommandCenter = () => {
   const [activeTab, setActiveTab] = useState('command');
@@ -768,42 +767,7 @@ const CommandCenter = () => {
     <section id="command-center" className="p-6 mb-16">
       <div className="max-w-6xl mx-auto bg-gray-900 rounded-lg overflow-hidden shadow-2xl">
         {/* Top Navigation Bar */}
-        <nav className="bg-gray-800 px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <img src={"/images/logo.png"} alt="Logo" className="h-10 w-10 mr-3" />
-            <span className="text-xl font-bold text-white military-header">SOLDIERS OF WEALTH</span>
-          </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="soldier-counter px-4 py-2 rounded-lg flex items-center">
-              <img src={"/images/soldier.png"} alt="Soldier Icon" className="h-8 w-8 mr-2" />
-              <span className="text-xl font-bold text-white">165 SOLDIERS</span>
-            </div>
-            
-            <div className="flex items-center text-gray-400">
-              <span className="mr-1">Week:</span>
-              <span className="text-white font-bold">2</span>
-              <span className="mx-1">/</span>
-              <span>4</span>
-            </div>
-            
-            <div className="text-gray-400">
-              <span>Moves Due: </span>
-              <span className="text-yellow-400 font-bold">23:59:42</span>
-            </div>
-            
-            <div className="relative">
-               <Link to="/profile" className="relative">
-                <FaUserCircle className="h-10 w-10 text-gray-400" />
-                {notifications > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
-                    {notifications}
-                  </span>
-                )}
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <ResponsiveNavbar />
         
         {/* Command Center Tabs */}
         <div className="flex border-b border-gray-700">
