@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { FaEdit, FaTrash, FaTimes } from 'react-icons/fa';
 
 const PlayerManagement = () => {
   const [players, setPlayers] = useState([]);
@@ -21,7 +22,7 @@ const PlayerManagement = () => {
     investments: { 
       stocks: 0, 
       realEstate: 0, 
-      cash: 100  // Start with all money in cash
+      cash: 100
     },
     createdAt: new Date().toISOString()
   });
@@ -50,14 +51,12 @@ const PlayerManagement = () => {
     e.preventDefault();
     
     try {
-      // Create authentication account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         newPlayer.email,
         newPlayer.password
       );
 
-      // Create player document
       const playerData = {
         uid: userCredential.user.uid,
         email: newPlayer.email,
@@ -88,7 +87,7 @@ const PlayerManagement = () => {
         investments: { 
           stocks: 0, 
           realEstate: 0, 
-          cash: 100  // Start with all money in cash
+          cash: 100
         },
         createdAt: new Date().toISOString()
       });
@@ -130,228 +129,180 @@ const PlayerManagement = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
         <h2 className="text-xl font-bold">Player Management</h2>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="px-4 py-2 bg-green-600 rounded-md hover:bg-green-700"
+          className="w-full sm:w-auto px-4 py-2 bg-green-600 rounded-md hover:bg-green-700 text-white text-center"
         >
           Create New Player
         </button>
       </div>
 
-      {/* Create Player Form */}
-      {showCreateForm && (
+      {/* Players List */}
+      <div className="overflow-x-auto">
+        <div className="inline-block min-w-full align-middle">
+          <div className="overflow-hidden border border-gray-700 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Player</th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Title</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Soldiers</th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Manage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {players.map(player => (
+                  <tr key={player.id} className="hover:bg-gray-700">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <div className="font-medium text-white">{player.displayName}</div>
+                        <div className="text-sm text-gray-400">{player.email}</div>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-gray-300">{player.title}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-300">{player.soldiers}</td>
+                    <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-gray-300">{player.actionsRemaining}/{player.actionsPerWeek}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEdit(player)}
+                        className="text-blue-400 hover:text-blue-300 mr-3"
+                      >
+                        <FaEdit className="inline-block" />
+                        <span className="sr-only">Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(player.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <FaTrash className="inline-block" />
+                        <span className="sr-only">Delete</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Create/Edit Modal */}
+      {(showCreateForm || editingPlayer) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Create New Player</h3>
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">
+                {editingPlayer ? 'Edit Player' : 'Create New Player'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setEditingPlayer(null);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
+
             <form onSubmit={handleCreatePlayer} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input
-                  type="email"
-                  value={newPlayer.email}
-                  onChange={(e) => setNewPlayer({...newPlayer, email: e.target.value})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  required
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editingPlayer?.email || newPlayer.email}
+                    onChange={(e) => editingPlayer 
+                      ? setEditingPlayer({...editingPlayer, email: e.target.value})
+                      : setNewPlayer({...newPlayer, email: e.target.value})
+                    }
+                    className="w-full bg-gray-700 rounded p-2 text-white"
+                    required
+                  />
+                </div>
+
+                {!editingPlayer && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={newPlayer.password}
+                      onChange={(e) => setNewPlayer({...newPlayer, password: e.target.value})}
+                      className="w-full bg-gray-700 rounded p-2 text-white"
+                      required
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Display Name</label>
+                  <input
+                    type="text"
+                    value={editingPlayer?.displayName || newPlayer.displayName}
+                    onChange={(e) => editingPlayer
+                      ? setEditingPlayer({...editingPlayer, displayName: e.target.value})
+                      : setNewPlayer({...newPlayer, displayName: e.target.value})
+                    }
+                    className="w-full bg-gray-700 rounded p-2 text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editingPlayer?.title || newPlayer.title}
+                    onChange={(e) => editingPlayer
+                      ? setEditingPlayer({...editingPlayer, title: e.target.value})
+                      : setNewPlayer({...newPlayer, title: e.target.value})
+                    }
+                    className="w-full bg-gray-700 rounded p-2 text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Soldiers</label>
+                  <input
+                    type="number"
+                    value={editingPlayer?.soldiers || newPlayer.soldiers}
+                    onChange={(e) => editingPlayer
+                      ? setEditingPlayer({...editingPlayer, soldiers: parseInt(e.target.value)})
+                      : setNewPlayer({...newPlayer, soldiers: parseInt(e.target.value)})
+                    }
+                    className="w-full bg-gray-700 rounded p-2 text-white"
+                    min="0"
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
-                <input
-                  type="password"
-                  value={newPlayer.password}
-                  onChange={(e) => setNewPlayer({...newPlayer, password: e.target.value})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Display Name</label>
-                <input
-                  type="text"
-                  value={newPlayer.displayName}
-                  onChange={(e) => setNewPlayer({...newPlayer, displayName: e.target.value})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Title</label>
-                <input
-                  type="text"
-                  value={newPlayer.title}
-                  onChange={(e) => setNewPlayer({...newPlayer, title: e.target.value})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Initial Soldiers</label>
-                <input
-                  type="number"
-                  value={newPlayer.soldiers}
-                  onChange={(e) => setNewPlayer({...newPlayer, soldiers: parseInt(e.target.value)})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  min="0"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Actions</label>
-                <input
-                  type="number"
-                  value={newPlayer.actions}
-                  onChange={(e) => setNewPlayer({...newPlayer, actions: parseInt(e.target.value)})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  min="0"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Defense Level</label>
-                <input
-                  type="number"
-                  value={newPlayer.defenseLevel}
-                  onChange={(e) => setNewPlayer({...newPlayer, defenseLevel: parseInt(e.target.value)})}
-                  className="w-full bg-gray-700 rounded p-2"
-                  min="1"
-                  required
-                />
-              </div>
-
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-green-600 text-white p-2 rounded hover:bg-green-700"
-                >
-                  Create Player
-                </button>
+              <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="flex-1 bg-gray-600 text-white p-2 rounded hover:bg-gray-700"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setEditingPlayer(null);
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  {editingPlayer ? 'Save Changes' : 'Create Player'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Players Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-gray-800">
-          <thead>
-            <tr className="border-b border-gray-700">
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Title</th>
-              <th className="px-4 py-2">Soldiers</th>
-              <th className="px-4 py-2">Actions</th>
-              <th className="px-4 py-2">Defense</th>
-              <th className="px-4 py-2">Controls</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map(player => (
-              <tr key={player.id} className="border-b border-gray-700">
-                {editingPlayer?.id === player.id ? (
-                  // Edit Mode
-                  <>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        value={editingPlayer.displayName}
-                        onChange={(e) => setEditingPlayer({...editingPlayer, displayName: e.target.value})}
-                        className="bg-gray-700 px-2 py-1 rounded w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2">{player.email}</td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        value={editingPlayer.title}
-                        onChange={(e) => setEditingPlayer({...editingPlayer, title: e.target.value})}
-                        className="bg-gray-700 px-2 py-1 rounded w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        value={editingPlayer.soldiers}
-                        onChange={(e) => setEditingPlayer({...editingPlayer, soldiers: parseInt(e.target.value)})}
-                        className="bg-gray-700 px-2 py-1 rounded w-20"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        value={editingPlayer.actions}
-                        onChange={(e) => setEditingPlayer({...editingPlayer, actions: parseInt(e.target.value)})}
-                        className="bg-gray-700 px-2 py-1 rounded w-20"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        value={editingPlayer.defenseLevel}
-                        onChange={(e) => setEditingPlayer({...editingPlayer, defenseLevel: parseInt(e.target.value)})}
-                        className="bg-gray-700 px-2 py-1 rounded w-20"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 bg-green-600 rounded-md mr-2"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingPlayer(null)}
-                        className="px-3 py-1 bg-gray-600 rounded-md"
-                      >
-                        Cancel
-                      </button>
-                    </td>
-                  </>
-                ) : (
-                  // View Mode
-                  <>
-                    <td className="px-4 py-2">{player.displayName}</td>
-                    <td className="px-4 py-2">{player.email}</td>
-                    <td className="px-4 py-2">{player.title}</td>
-                    <td className="px-4 py-2">{player.soldiers}</td>
-                    <td className="px-4 py-2">{player.actions}</td>
-                    <td className="px-4 py-2">{player.defenseLevel}</td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={() => handleEdit(player)}
-                        className="px-3 py-1 bg-blue-600 rounded-md mr-2"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(player.id)}
-                        className="px-3 py-1 bg-red-600 rounded-md"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 };
