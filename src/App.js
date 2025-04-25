@@ -35,7 +35,6 @@ function App() {
                   <Game />
                 </PrivateRoute>
               } />
-              {/* Add the new dynamic route for specific game battles */}
               <Route path="/game/:gameId" element={
                 <PrivateRoute>
                   <GameRoute>
@@ -43,13 +42,6 @@ function App() {
                   </GameRoute>
                 </PrivateRoute>
               } />
-              {/* <Route path="/commandcenter" element={
-                <PrivateRoute>
-                  <GameRoute>
-                    <CommandCenter />
-                  </GameRoute>
-                </PrivateRoute>
-              } /> */}
               <Route path="/profile" element={
                 <PrivateRoute>
                   <Profile />

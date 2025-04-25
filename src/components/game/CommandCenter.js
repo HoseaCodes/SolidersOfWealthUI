@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import PlayerActions from './PlayerActions';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, addDoc, doc, getDoc, updateDoc, setDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import ResponsiveNavbar from './Navbar';
 
@@ -10,6 +10,7 @@ const CommandCenter = () => {
   const [activeTab, setActiveTab] = useState('command');
   const [currentWeek, setCurrentWeek] = useState(1);
   const [soldiers, setSoldiers] = useState(165);
+  const [actionsRemaining, setActionsRemaining] = useState(3);
   const [currentAction, setCurrentAction] = useState(null);
   const [notifications] = useState(3);
   const [soldierInvestments, setSoldierInvestments] = useState({
@@ -21,7 +22,15 @@ const CommandCenter = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attackSoldiers, setAttackSoldiers] = useState(50);
   const [gameData, setGameData] = useState(null);
+  const [playerData, setPlayerData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [weeklyIntelligence, setWeeklyIntelligence] = useState([]);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [weeklyMoves, setWeeklyMoves] = useState([]);
+  const [maxMoves, setMaxMoves] = useState(3);
+  const [movesSubmitted, setMovesSubmitted] = useState(false);
+  const [isEditingMoves, setIsEditingMoves] = useState(false);
   const { currentUser } = useAuth();
   const db = getFirestore();
   const playerId = currentUser?.uid;
@@ -40,12 +49,18 @@ const CommandCenter = () => {
               id: gameDoc.id,
               ...gameDoc.data()
             });
+            
+            // Load current week from game data
+            const weekData = gameDoc.data().currentWeek || 1;
+            setCurrentWeek(weekData);
           } else {
             console.error('Game not found');
+            setErrorMessage('Game not found. Please check the game ID.');
             // Handle game not found error
           }
         } catch (error) {
           console.error('Error loading game data:', error);
+          setErrorMessage(`Error loading game data: ${error.message}`);
         } finally {
           setLoading(false);
         }
@@ -54,6 +69,127 @@ const CommandCenter = () => {
     
     loadGameData();
   }, [gameId, db]);
+
+  // Load player-specific data
+  useEffect(() => {
+    const loadPlayerData = async () => {
+      if (gameId && playerId) {
+        try {
+          // Get player document from the game
+          const playerDocRef = doc(db, 'games', gameId, 'players', playerId);
+          const playerDoc = await getDoc(playerDocRef);
+          
+          if (playerDoc.exists()) {
+            // Player exists, load their data
+            const data = playerDoc.data();
+            setPlayerData(data);
+            setActionsRemaining(data.actionsRemaining || 3);
+            setSoldiers(data.soldiers || 165);
+            
+            // Load current investments if available
+            if (data.investments) {
+              setSoldierInvestments(data.investments);
+            }
+          } else {
+            console.log("Player document doesn't exist yet - will be created when first action is taken");
+          }
+          
+          // Try to load intelligence with all filters first
+          try {
+            // Load intelligence specific to this player
+            const intelligenceRef = collection(db, 'games', gameId, 'intelligence');
+            const q = query(
+              intelligenceRef, 
+              where('targetPlayerId', '==', playerId),
+              where('week', '==', currentWeek),
+              orderBy('timestamp', 'desc')
+            );
+            
+            const intelligenceSnapshot = await getDocs(q);
+            const intelligenceData = intelligenceSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            
+            setWeeklyIntelligence(intelligenceData);
+          } catch (error) {
+            console.warn('Intelligence query requires an index. Falling back to simpler query:', error);
+            
+            // If the composite index doesn't exist, fall back to a simpler query
+            try {
+              const intelligenceRef = collection(db, 'games', gameId, 'intelligence');
+              const simpleQuery = query(
+                intelligenceRef, 
+                where('targetPlayerId', '==', playerId)
+              );
+              
+              const intelligenceSnapshot = await getDocs(simpleQuery);
+              const intelligenceData = intelligenceSnapshot.docs
+                .map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                }))
+                // Filter for current week and sort by timestamp manually
+                .filter(intel => intel.week === currentWeek)
+                .sort((a, b) => {
+                  // Sort by timestamp in descending order (newest first)
+                  const timestampA = a.timestamp?.toDate?.() || new Date(0);
+                  const timestampB = b.timestamp?.toDate?.() || new Date(0);
+                  return timestampB - timestampA;
+                });
+              
+              setWeeklyIntelligence(intelligenceData);
+            } catch (fallbackError) {
+              console.error('Error loading intelligence with fallback query:', fallbackError);
+              setWeeklyIntelligence([]);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading player data:', error);
+          setErrorMessage(`Error loading player data: ${error.message}`);
+        }
+      }
+    };
+    
+    loadPlayerData();
+  }, [gameId, playerId, db, currentWeek]);
+
+  // Load weekly moves data
+  useEffect(() => {
+    const loadPlayerWeeklyMoves = async () => {
+      if (gameId && playerId) {
+        try {
+          // Check if player has already submitted moves for this week
+          const playerMovesRef = collection(db, 'games', gameId, 'weeklyMoves');
+          const q = query(
+            playerMovesRef,
+            where('playerId', '==', playerId),
+            where('week', '==', currentWeek)
+          );
+          
+          const movesSnapshot = await getDocs(q);
+          
+          if (!movesSnapshot.empty) {
+            // Player has already submitted moves for this week
+            const moveDoc = movesSnapshot.docs[0];
+            const moveData = moveDoc.data();
+            
+            setWeeklyMoves(moveData.moves || []);
+            setMovesSubmitted(true);
+          } else {
+            // No moves submitted for this week
+            setWeeklyMoves([]);
+            setMovesSubmitted(false);
+          }
+        } catch (error) {
+          console.error('Error loading weekly moves:', error);
+          setErrorMessage(`Error loading weekly moves: ${error.message}`);
+        }
+      }
+    };
+    
+    loadPlayerWeeklyMoves();
+  }, [gameId, playerId, db, currentWeek]);
   
   // Default players data
   const players = [
@@ -61,13 +197,13 @@ const CommandCenter = () => {
       id: 'you',
       name: 'YOU',
       title: 'Commander Alpha',
-      soldiers: 100,
+      soldiers: soldiers, // Use dynamic soldier count
       weeklySoldierIncome: 50,
       actionsPerWeek: 3,
-      actionsRemaining: 3,
+      actionsRemaining: actionsRemaining, // Use dynamic actions remaining
       defense: 'Strong',
       defenseLevel: 75,
-      investments: { stocks: 25, realEstate: 40, cash: 35 },
+      investments: soldierInvestments, // Use dynamic investments
       isYou: true
     },
     {
@@ -118,6 +254,350 @@ const CommandCenter = () => {
     { type: 'empty' }, { type: 'empty' }, { type: 'alliance', name: 'Alliance', desc: 'Opportunity' }, { type: 'empty' }, { type: 'empty' },
     { type: 'empty' }, { type: 'empty' }, { type: 'empty' }, { type: 'player', player: 'grace', soldiers: 70 }, { type: 'empty' }
   ];
+
+  // Handler for adding a move to the weekly moves
+  const addWeeklyMove = (moveData) => {
+    // Check if we've reached the maximum number of moves
+    if (weeklyMoves.length >= maxMoves && !isEditingMoves) {
+      setErrorMessage(`You can only select up to ${maxMoves} moves per week`);
+      return false;
+    }
+    
+    // Don't allow adding moves if they're already submitted (unless editing)
+    if (movesSubmitted && !isEditingMoves) {
+      setErrorMessage("Your moves for this week have already been submitted. Edit your moves to make changes.");
+      return false;
+    }
+    
+    // Add the move to the array
+    if (isEditingMoves) {
+      // If editing, replace existing moves
+      const updatedMoves = [...weeklyMoves];
+      
+      // Find if this type of move already exists and replace it
+      const existingMoveIndex = updatedMoves.findIndex(move => 
+        (move.type === 'investment' && moveData.investment) ||
+        (move.type === 'offensive' && moveData.offensive)
+      );
+      
+      if (existingMoveIndex >= 0) {
+        updatedMoves[existingMoveIndex] = {
+          ...moveData,
+          type: moveData.investment ? 'investment' : 'offensive'
+        };
+      } else if (updatedMoves.length < maxMoves) {
+        updatedMoves.push({
+          ...moveData,
+          type: moveData.investment ? 'investment' : 'offensive'
+        });
+      } else {
+        setErrorMessage(`You can only select up to ${maxMoves} moves per week`);
+        return false;
+      }
+      
+      setWeeklyMoves(updatedMoves);
+    } else {
+      // If not editing, add to the existing moves
+      setWeeklyMoves([
+        ...weeklyMoves, 
+        {
+          ...moveData,
+          type: moveData.investment ? 'investment' : 'offensive'
+        }
+      ]);
+    }
+    
+    return true;
+  };
+
+  // Add function to submit all weekly moves to the database
+  const submitWeeklyMoves = async () => {
+    if (weeklyMoves.length === 0) {
+      setErrorMessage("You must select at least one move before submitting");
+      return;
+    }
+    
+    if (gameId && playerId) {
+      try {
+        // First create or update the player document
+        const playerDocRef = doc(db, 'games', gameId, 'players', playerId);
+        const playerDoc = await getDoc(playerDocRef);
+        
+        if (!playerDoc.exists()) {
+          // Create player document if it doesn't exist
+          await setDoc(playerDocRef, {
+            playerId,
+            playerName: currentUser?.displayName || "Unknown Player",
+            soldiers: soldiers,
+            actionsRemaining: 0, // All actions used for this week
+            investments: soldierInvestments,
+            createdAt: new Date(),
+            lastUpdated: new Date()
+          });
+          console.log("Created new player document");
+        } else {
+          // Update existing document to show all actions used
+          await updateDoc(playerDocRef, {
+            actionsRemaining: 0,
+            lastUpdated: new Date()
+          });
+        }
+        
+        // Find existing weekly moves document for this week
+        const weeklyMovesRef = collection(db, 'games', gameId, 'weeklyMoves');
+        const q = query(
+          weeklyMovesRef,
+          where('playerId', '==', playerId),
+          where('week', '==', currentWeek)
+        );
+        
+        const existingMoves = await getDocs(q);
+        
+        if (!existingMoves.empty) {
+          // Update existing document
+          const moveDocRef = doc(db, 'games', gameId, 'weeklyMoves', existingMoves.docs[0].id);
+          await updateDoc(moveDocRef, {
+            moves: weeklyMoves,
+            lastUpdated: new Date()
+          });
+        } else {
+          // Create new document for this week's moves
+          await addDoc(weeklyMovesRef, {
+            playerId,
+            playerName: currentUser?.displayName || "You",
+            week: currentWeek,
+            timestamp: new Date(),
+            moves: weeklyMoves,
+            status: 'pending' // Will be processed at end of week
+          });
+        }
+        
+        // Update local state
+        setMovesSubmitted(true);
+        setIsEditingMoves(false);
+        setActionsRemaining(0);
+        
+        // Set success message
+        setErrorMessage(null);
+        setSuccessMessage("Your moves for this week have been submitted successfully!");
+        
+        // Clear success message after a few seconds
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 5000);
+        
+      } catch (error) {
+        console.error('Error submitting weekly moves:', error);
+        setErrorMessage(`Failed to submit moves: ${error.message}`);
+      }
+    }
+  };
+
+  // Add function to toggle editing mode
+  const toggleEditMoves = () => {
+    setIsEditingMoves(!isEditingMoves);
+    
+    if (!isEditingMoves) {
+      // When entering edit mode, restore actions
+      setActionsRemaining(3);
+    } else {
+      // When exiting edit mode, mark actions as used
+      setActionsRemaining(0);
+    }
+  };
+
+  // Add function to remove a move from the weekly moves list
+  const removeWeeklyMove = (index) => {
+    const updatedMoves = [...weeklyMoves];
+    updatedMoves.splice(index, 1);
+    setWeeklyMoves(updatedMoves);
+  };
+
+  // Add function to render the weekly moves dashboard
+  const renderWeeklyMovesDashboard = () => {
+    return (
+      <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold military-header">WEEKLY MOVES</h3>
+          <div className="flex items-center">
+            <span className="text-sm text-gray-400 mr-2">MOVES SELECTED</span>
+            <div className="flex space-x-1">
+              {Array.from({ length: maxMoves }).map((_, index) => (
+                <div 
+                  key={index} 
+                  className={`h-3 w-3 rounded-full ${index < weeklyMoves.length ? 'bg-green-500' : 'bg-gray-600'}`}
+                ></div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {weeklyMoves.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-gray-400">No moves selected for this week.</p>
+            <p className="text-sm text-gray-500 mt-2">Use the Market or Battlefield to select your moves.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {weeklyMoves.map((move, index) => (
+              <div key={index} className="p-4 bg-gray-700/30 rounded-lg border border-gray-600">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-gray-400 text-sm mb-1">MOVE {index + 1}</div>
+                    <div className="font-bold">
+                      {move.type === 'investment' ? 
+                        `INVEST ${move.investment.amount} SOLDIERS IN ${move.investment.market.toUpperCase()}` : 
+                        `${move.offensive.type.toUpperCase()} ${move.offensive.targetName.toUpperCase()}`
+                      }
+                    </div>
+                  </div>
+                  {isEditingMoves && (
+                    <button 
+                      onClick={() => removeWeeklyMove(index)}
+                      className="text-red-500 hover:text-red-300 transition-colors"
+                    >
+                      <span className="sr-only">Remove</span>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="mt-6 flex space-x-4 justify-end">
+          {!movesSubmitted ? (
+            <button
+              onClick={submitWeeklyMoves}
+              disabled={weeklyMoves.length === 0}
+              className={`py-3 px-6 ${weeklyMoves.length > 0 ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-700 cursor-not-allowed'} rounded transition-all duration-300`}
+            >
+              SUBMIT MOVES FOR WEEK {currentWeek}
+            </button>
+          ) : (
+            <button
+              onClick={toggleEditMoves}
+              className={`py-3 px-6 ${isEditingMoves ? 'bg-red-700 hover:bg-red-600' : 'bg-blue-700 hover:bg-blue-600'} rounded transition-all duration-300`}
+            >
+              {isEditingMoves ? 'CANCEL EDITING' : 'EDIT MOVES FOR WEEK ' + currentWeek}
+            </button>
+          )}
+          
+          {isEditingMoves && (
+            <button
+              onClick={submitWeeklyMoves}
+              disabled={weeklyMoves.length === 0}
+              className={`py-3 px-6 ${weeklyMoves.length > 0 ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-700 cursor-not-allowed'} rounded transition-all duration-300`}
+            >
+              SAVE CHANGES
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Validation function for actions
+  const validateAction = (actionData) => {
+    if (!actionData) {
+      return { valid: false, message: "No action selected" };
+    }
+    
+    // Ensure proper structure to prevent undefined fields later
+    if (!actionData.investment && !actionData.offensive) {
+      return { valid: false, message: "Action must contain either an investment or offensive operation" };
+    }
+    
+    // Validate investment actions
+    if (actionData.investment) {
+      const { type, amount, market } = actionData.investment;
+      
+      if (!amount || amount <= 0) {
+        return { valid: false, message: "Investment amount must be positive" };
+      }
+      
+      if (amount > soldiers) {
+        return { valid: false, message: `Cannot invest ${amount} soldiers when you only have ${soldiers}` };
+      }
+      
+      if (!market) {
+        return { valid: false, message: "No market selected for investment" };
+      }
+      
+      // Clean up structure to ensure no undefined fields
+      const cleanInvestment = {
+        type: type || 'invest',
+        amount: amount,
+        market: market
+      };
+      
+      // Return the cleaned action data
+      return { 
+        valid: true, 
+        cleanedData: {
+          ...actionData,
+          investment: cleanInvestment,
+          // Remove any potential undefined offensive field
+          offensive: null
+        }
+      };
+    }
+    
+    // Validate offensive actions
+    if (actionData.offensive) {
+      const { type, targetPlayer, targetName } = actionData.offensive;
+      
+      if (!type) {
+        return { valid: false, message: "No offensive action type specified" };
+      }
+      
+      if (!targetPlayer) {
+        return { valid: false, message: "No target selected for offensive action" };
+      }
+      
+      if (!targetName) {
+        return { valid: false, message: "Target name is missing" };
+      }
+      
+      // Additional validation for attack actions
+      if (type === 'attack') {
+        // Check if player has enough soldiers for an attack
+        if (soldiers < 25) {
+          return { valid: false, message: "Need at least 25 soldiers to launch an attack" };
+        }
+      }
+      
+      // Additional validation for spy actions
+      if (type === 'spy') {
+        // Check if player has enough soldiers for a spy mission
+        if (soldiers < 10) {
+          return { valid: false, message: "Need at least 10 soldiers to deploy a spy" };
+        }
+      }
+      
+      // Clean up structure to ensure no undefined fields
+      const cleanOffensive = {
+        type: type,
+        targetPlayer: targetPlayer,
+        targetName: targetName || 'Unknown Commander'
+      };
+      
+      // Return the cleaned action data
+      return { 
+        valid: true, 
+        cleanedData: {
+          ...actionData,
+          offensive: cleanOffensive,
+          // Remove any potential undefined investment field
+          investment: null
+        }
+      };
+    }
+    
+    // Should never reach here due to structure checks above, but just in case
+    return { valid: false, message: "Invalid action structure" };
+  };
 
   const calculateSuccessChance = (attacker, defender) => {
     const defenseRating = {
@@ -205,6 +685,38 @@ const CommandCenter = () => {
   const renderBattlefield = () => {
     return (
       <div className="space-y-6">
+        {/* Error Message Alert */}
+        {errorMessage && (
+          <div className="bg-red-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">ERROR</h3>
+              <p>{errorMessage}</p>
+            </div>
+            <button 
+              onClick={() => setErrorMessage(null)}
+              className="text-white hover:text-red-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
+        {/* Success Message Alert */}
+        {successMessage && (
+          <div className="bg-green-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">SUCCESS</h3>
+              <p>{successMessage}</p>
+            </div>
+            <button 
+              onClick={() => setSuccessMessage(null)}
+              className="text-white hover:text-green-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
         {/* Economic Status Alert */}
         <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
           <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
@@ -220,6 +732,17 @@ const CommandCenter = () => {
           <div>
             <h3 className="text-2xl font-bold military-header">BATTLEFIELD MAP</h3>
             <p className="text-gray-400">Strategic view of all commanders and their positions</p>
+          </div>
+          <div className="flex items-center">
+            <span className="text-sm text-gray-400 mr-2">ACTIONS REMAINING</span>
+            <div className="flex space-x-1">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div 
+                  key={index} 
+                  className={`h-3 w-3 rounded-full ${index < (isEditingMoves ? 3 : actionsRemaining) ? 'bg-green-500' : 'bg-gray-600'}`}
+                ></div>
+              ))}
+            </div>
           </div>
         </div>
         
@@ -285,15 +808,57 @@ const CommandCenter = () => {
                 <div className="space-y-2">
                   <button
                     onClick={() => handleBattlefieldAction('attack', player.id)}
-                    className="w-full py-2 px-4 bg-red-900/50 hover:bg-red-800/50 rounded border border-red-700 transition-all duration-300 hover:scale-105"
+                    className={`w-full py-2 px-4 ${
+                      (isEditingMoves || actionsRemaining > 0) && weeklyMoves.length < maxMoves 
+                        ? 'bg-red-900/50 hover:bg-red-800/50' 
+                        : 'bg-gray-800 cursor-not-allowed'
+                    } rounded border border-red-700 transition-all duration-300 ${
+                      (isEditingMoves || actionsRemaining > 0) && weeklyMoves.length < maxMoves 
+                        ? 'hover:scale-105' 
+                        : ''
+                    }`}
+                    disabled={
+                      (actionsRemaining <= 0 && !isEditingMoves) || 
+                      (weeklyMoves.length >= maxMoves && !isEditingMoves) || 
+                      (movesSubmitted && !isEditingMoves)
+                    }
                   >
-                    LAUNCH ATTACK
+                    LAUNCH ATTACK {
+                      movesSubmitted && !isEditingMoves 
+                        ? '(MOVES SUBMITTED)' 
+                        : weeklyMoves.length >= maxMoves && !isEditingMoves 
+                          ? '(MAX MOVES SELECTED)' 
+                          : actionsRemaining <= 0 && !isEditingMoves 
+                            ? '(NO ACTIONS LEFT)' 
+                            : ''
+                    }
                   </button>
                   <button
                     onClick={() => handleBattlefieldAction('spy', player.id)}
-                    className="w-full py-2 px-4 bg-gray-700/50 hover:bg-gray-600/50 rounded border border-gray-600 transition-all duration-300 hover:scale-105"
+                    className={`w-full py-2 px-4 ${
+                      (isEditingMoves || actionsRemaining > 0) && weeklyMoves.length < maxMoves 
+                        ? 'bg-gray-700/50 hover:bg-gray-600/50' 
+                        : 'bg-gray-800 cursor-not-allowed'
+                    } rounded border border-gray-600 transition-all duration-300 ${
+                      (isEditingMoves || actionsRemaining > 0) && weeklyMoves.length < maxMoves 
+                        ? 'hover:scale-105' 
+                        : ''
+                    }`}
+                    disabled={
+                      (actionsRemaining <= 0 && !isEditingMoves) || 
+                      (weeklyMoves.length >= maxMoves && !isEditingMoves) || 
+                      (movesSubmitted && !isEditingMoves)
+                    }
                   >
-                    DEPLOY SPY
+                    DEPLOY SPY {
+                      movesSubmitted && !isEditingMoves 
+                        ? '(MOVES SUBMITTED)' 
+                        : weeklyMoves.length >= maxMoves && !isEditingMoves 
+                          ? '(MAX MOVES SELECTED)' 
+                          : actionsRemaining <= 0 && !isEditingMoves 
+                            ? '(NO ACTIONS LEFT)' 
+                            : ''
+                    }
                   </button>
                 </div>
               </div>
@@ -313,17 +878,50 @@ const CommandCenter = () => {
   };
 
   const handleBattlefieldAction = (actionType, targetPlayerId) => {
+    // If no actions remaining or moves submitted, don't allow new actions
+    if (actionsRemaining <= 0 && !isEditingMoves) {
+      setErrorMessage("No actions remaining this week");
+      return;
+    }
+    
+    if (movesSubmitted && !isEditingMoves) {
+      setErrorMessage("Your moves for this week have already been submitted. Edit your moves to make changes.");
+      return;
+    }
+    
+    if (weeklyMoves.length >= maxMoves && !isEditingMoves) {
+      setErrorMessage(`You can only select up to ${maxMoves} moves per week`);
+      return;
+    }
+    
     const targetPlayer = players.find(p => p.id === targetPlayerId);
     const actionData = {
-      investment: currentAction?.investment, // Keep existing investment data
       offensive: {
         type: actionType,
         targetPlayer: targetPlayerId,
         targetName: targetPlayer?.name || 'Unknown Commander'
       }
     };
-    setCurrentAction(actionData);
-    setActiveTab('command'); // Return to command center to show the selection
+    
+    // Validate and clean the action data
+    const validationResult = validateAction(actionData);
+    
+    if (!validationResult.valid) {
+      setErrorMessage(validationResult.message);
+      return;
+    }
+    
+    // Use the cleaned data
+    const cleanedActionData = validationResult.cleanedData;
+    
+    // Add to weekly moves
+    const moveAdded = addWeeklyMove(cleanedActionData);
+    
+    if (moveAdded) {
+      setCurrentAction(cleanedActionData);
+      // Return to command center to show the selection
+      setActiveTab('command');
+    }
   };
 
   const tabClass = (tabName) => 
@@ -354,29 +952,77 @@ const CommandCenter = () => {
   };
 
   const handleMarketInvestment = (market, amount) => {
-    setCurrentAction({
+    // If no actions remaining or moves submitted, don't allow new actions
+    if (actionsRemaining <= 0 && !isEditingMoves) {
+      setErrorMessage("No actions remaining this week");
+      return;
+    }
+    
+    if (movesSubmitted && !isEditingMoves) {
+      setErrorMessage("Your moves for this week have already been submitted. Edit your moves to make changes.");
+      return;
+    }
+    
+    if (weeklyMoves.length >= maxMoves && !isEditingMoves) {
+      setErrorMessage(`You can only select up to ${maxMoves} moves per week`);
+      return;
+    }
+    
+    // Validate amount
+    if (amount > soldiers) {
+      setErrorMessage(`Cannot invest ${amount} soldiers when you only have ${soldiers}`);
+      return;
+    }
+    
+    const actionData = {
       investment: {
         type: 'invest',
         amount: amount,
         market: market
       }
-    });
-    setActiveTab('command'); // Switch back to command tab after investment
-  };
-
-  const handleActionSubmit = (actionData) => {
-    // Only update if we have valid action data
-    if (actionData === null) {
-      setCurrentAction(null);
+    };
+    
+    // Validate and clean the action data
+    const validationResult = validateAction(actionData);
+    
+    if (!validationResult.valid) {
+      setErrorMessage(validationResult.message);
       return;
     }
     
-    // Validate soldier amount for investments
-    if (actionData.investment?.amount > soldiers) {
-      return; // Don't update if amount exceeds available soldiers
+    // Use the cleaned data
+    const cleanedActionData = validationResult.cleanedData;
+    
+    // Add to weekly moves
+    const moveAdded = addWeeklyMove(cleanedActionData);
+    
+    if (moveAdded) {
+      setCurrentAction(cleanedActionData);
+      // Switch back to command tab after investment
+      setActiveTab('command');
+    }
+  };
+
+  const handleActionSubmit = async (actionData) => {
+    // Validate the action
+    const validationResult = validateAction(actionData);
+    
+    if (!validationResult.valid) {
+      setErrorMessage(validationResult.message);
+      return;
     }
     
-    setCurrentAction(actionData);
+    // Use the cleaned data
+    const cleanedActionData = validationResult.cleanedData;
+    
+    // Add to weekly moves
+    const moveAdded = addWeeklyMove(cleanedActionData);
+    
+    if (!moveAdded) {
+      return; // If move wasn't added, don't continue
+    }
+    
+    setCurrentAction(cleanedActionData);
   };
 
   const handleViewMarket = () => {
@@ -433,6 +1079,38 @@ const CommandCenter = () => {
 
     return (
       <div className="space-y-6">
+        {/* Error Message Alert */}
+        {errorMessage && (
+          <div className="bg-red-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">ERROR</h3>
+              <p>{errorMessage}</p>
+            </div>
+            <button 
+              onClick={() => setErrorMessage(null)}
+              className="text-white hover:text-red-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
+        {/* Success Message Alert */}
+        {successMessage && (
+          <div className="bg-green-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">SUCCESS</h3>
+              <p>{successMessage}</p>
+            </div>
+            <button 
+              onClick={() => setSuccessMessage(null)}
+              className="text-white hover:text-green-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
         {/* Economic Status Alert */}
         <div className="economy-downturn px-6 py-4 rounded-lg">
           <h3 className="text-xl font-bold military-header mb-1">ECONOMIC STATUS REPORT</h3>
@@ -441,6 +1119,21 @@ const CommandCenter = () => {
             Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
             Business {marketStatus.business}%
           </p>
+        </div>
+        
+        {/* Actions Remaining Indicator */}
+        <div className="flex justify-end mb-3">
+          <div className="flex items-center">
+            <span className="text-sm text-gray-400 mr-2">ACTIONS REMAINING</span>
+            <div className="flex space-x-1">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div 
+                  key={index} 
+                  className={`h-3 w-3 rounded-full ${index < (isEditingMoves ? 3 : actionsRemaining) ? 'bg-green-500' : 'bg-gray-600'}`}
+                ></div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -478,12 +1171,12 @@ const CommandCenter = () => {
                 <div className="soldier-counter px-4 py-2 rounded-lg bg-gray-700/30 border border-gray-600">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">CURRENT DEPLOYMENT</span>
-                    <span className="font-bold">{soldierInvestments[market.id]} SOLDIERS</span>
+                    <span className="font-bold">{soldierInvestments[market.id] || 0} SOLDIERS</span>
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-sm text-gray-400">POTENTIAL RETURN</span>
                     <span className={market.status >= 0 ? 'text-green-500' : 'text-red-500'}>
-                      {calculatePotentialReturn(market.id, soldierInvestments[market.id])} SOLDIERS
+                      {calculatePotentialReturn(market.id, soldierInvestments[market.id] || 0)} SOLDIERS
                     </span>
                   </div>
                 </div>
@@ -497,17 +1190,48 @@ const CommandCenter = () => {
                     defaultValue={10}
                     className="bg-gray-800 p-2 rounded w-24 border border-gray-600 text-center font-bold"
                     id={`invest-${market.id}`}
+                    disabled={
+                      (actionsRemaining <= 0 && !isEditingMoves) || 
+                      (weeklyMoves.length >= maxMoves && !isEditingMoves) || 
+                      (movesSubmitted && !isEditingMoves)
+                    }
                   />
                   <button
                     onClick={() => {
                       const amount = parseInt(document.getElementById(`invest-${market.id}`).value) || 0;
-                      if (amount >= 10 && amount <= soldiers) {
+                      if (amount >= 10 && amount <= soldiers && 
+                          ((actionsRemaining > 0 && !movesSubmitted) || isEditingMoves) && 
+                          (weeklyMoves.length < maxMoves || isEditingMoves)) {
                         handleMarketInvestment(market.id, amount);
+                      } else if (amount > soldiers) {
+                        setErrorMessage(`Cannot invest ${amount} soldiers when you only have ${soldiers}`);
+                      } else if (amount < 10) {
+                        setErrorMessage(`Minimum investment is 10 soldiers`);
                       }
                     }}
-                    className={`flex-1 py-3 ${market.buttonClass} rounded px-4 transition-all duration-300 hover:scale-105`}
+                    className={`flex-1 py-3 ${
+                      (isEditingMoves || (actionsRemaining > 0 && !movesSubmitted && weeklyMoves.length < maxMoves)) 
+                        ? market.buttonClass 
+                        : 'bg-gray-800 cursor-not-allowed'
+                    } rounded px-4 transition-all duration-300 ${
+                      (isEditingMoves || (actionsRemaining > 0 && !movesSubmitted && weeklyMoves.length < maxMoves)) 
+                        ? 'hover:scale-105' 
+                        : ''
+                    }`}
+                    disabled={
+                      (actionsRemaining <= 0 && !isEditingMoves) || 
+                      (weeklyMoves.length >= maxMoves && !isEditingMoves) || 
+                      (movesSubmitted && !isEditingMoves)
+                    }
                   >
-                    DEPLOY {document.getElementById(`invest-${market.id}`)?.value || 10} SOLDIERS
+                    DEPLOY {document.getElementById(`invest-${market.id}`)?.value || 10} SOLDIERS 
+                    {movesSubmitted && !isEditingMoves 
+                      ? ' (MOVES SUBMITTED)' 
+                      : weeklyMoves.length >= maxMoves && !isEditingMoves 
+                        ? ' (MAX MOVES SELECTED)' 
+                        : actionsRemaining <= 0 && !isEditingMoves 
+                          ? ' (NO ACTIONS LEFT)' 
+                          : ''}
                   </button>
                 </div>
               </div>
@@ -536,27 +1260,27 @@ const CommandCenter = () => {
             <h3 className="text-xl font-bold military-header mb-4">STRATEGIC DEPLOYMENT</h3>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-gray-400 text-sm mb-1">CURRENT DEPLOYMENT</div>
-                <div className="font-bold">
-                  {currentAction.investment.market ? currentAction.investment.market.toUpperCase() : 'NO MARKET SELECTED'}
-                </div>
+                <div className="text-gray-400 text-sm mb-1">MARKET</div>
+                <div className="font-bold">{currentAction.investment.market.toUpperCase()}</div>
               </div>
               <div>
-                <div className="text-gray-400 text-sm mb-1">DEPLOYED FORCES</div>
+                <div className="text-gray-400 text-sm mb-1">DEPLOYMENT SIZE</div>
                 <div className="font-bold">{currentAction.investment.amount} SOLDIERS</div>
               </div>
               <div>
-                <div className="text-gray-400 text-sm mb-1">REMAINING FORCES</div>
-                <div className="font-bold">{soldiers - currentAction.investment.amount} SOLDIERS</div>
+                <div className="text-gray-400 text-sm mb-1">POTENTIAL RETURN</div>
+                <div className={marketStatus[currentAction.investment.market] >= 0 ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
+                  {calculatePotentialReturn(currentAction.investment.market, currentAction.investment.amount)} SOLDIERS
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Offensive Operations Display */}
+        {/* Offensive Action Display */}
         {currentAction.offensive && (
           <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700 mb-6">
-            <h3 className="text-xl font-bold military-header mb-4">OFFENSIVE OPERATIONS</h3>
+            <h3 className="text-xl font-bold military-header mb-4">STRATEGIC DEPLOYMENT</h3>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-gray-400 text-sm mb-1">OPERATION TYPE</div>
@@ -592,7 +1316,9 @@ const CommandCenter = () => {
     investmentROI: 10,
     wins: 0,
     successfulAttacks: 1,
+    failedAttacks: 1,
     successfulDefenses: 3,
+    failedDefenses: 1,
     totalAttacks: 2,
     totalDefenses: 4
   });
@@ -768,6 +1494,38 @@ const CommandCenter = () => {
 
     return (
       <div className="space-y-6">
+        {/* Error Message Alert */}
+        {errorMessage && (
+          <div className="bg-red-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">ERROR</h3>
+              <p>{errorMessage}</p>
+            </div>
+            <button 
+              onClick={() => setErrorMessage(null)}
+              className="text-white hover:text-red-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        
+        {/* Success Message Alert */}
+        {successMessage && (
+          <div className="bg-green-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold mb-1">SUCCESS</h3>
+              <p>{successMessage}</p>
+            </div>
+            <button 
+              onClick={() => setSuccessMessage(null)}
+              className="text-white hover:text-green-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="mb-6">
           <h3 className="text-2xl font-bold military-header">INTELLIGENCE CENTER</h3>
           <p className="text-gray-400">Track battalion rankings, performance metrics, and strategic opportunities</p>
@@ -797,6 +1555,55 @@ const CommandCenter = () => {
     );
   };
 
+  // Format timestamp for intelligence briefing
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+    
+    const date = timestamp instanceof Date ? timestamp : timestamp.toDate();
+    const now = new Date();
+    const diffMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffMinutes < 60) {
+      return `${diffMinutes} minutes ago`;
+    } else if (diffMinutes < 1440) {
+      return `${Math.floor(diffMinutes / 60)} hours ago`;
+    } else {
+      return `${Math.floor(diffMinutes / 1440)} days ago`;
+    }
+  };
+
+  // Render Intelligence Briefing
+  const renderIntelligenceBriefing = () => {
+    // If no intelligence data, show placeholder
+    if (weeklyIntelligence.length === 0) {
+      return (
+        <div>
+          <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
+          <div className="notification p-4 rounded-lg">
+            <p className="text-gray-400">No intelligence reports available for Week {currentWeek}.</p>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div>
+        <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
+        <div className="space-y-4">
+          {weeklyIntelligence.map(intel => (
+            <div key={intel.id} className={`notification ${intel.type === 'attack' ? 'notification-danger' : intel.type === 'market' ? 'notification-warning' : 'notification-info'} p-4 rounded-lg`}>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-bold">{intel.title || intel.type.toUpperCase()}</h4>
+                <span className="text-sm text-gray-500">{formatTimestamp(intel.timestamp)}</span>
+              </div>
+              <p className="text-gray-400">{intel.message}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Show loading state if we're waiting for game data
   if (loading) {
     return (
@@ -815,13 +1622,13 @@ const CommandCenter = () => {
         {/* Game Information Banner */}
         {gameData && (
           <div className="px-6 pt-4 pb-2 bg-gradient-to-r from-gray-800 to-gray-900">
-            <h2 className="text-2xl font-bold text-[#D4AF37]">{gameData.name}</h2>
+            <h2 className="text-2xl font-bold text-[#D4AF37]">{gameData.name || 'Battalion Command'}</h2>
             <div className="flex flex-wrap items-center text-sm text-gray-400 mt-1">
               <span className="mr-4">Battle ID: {gameId}</span>
               {gameData.startDate && <span className="mr-4">Begins: {new Date(gameData.startDate).toLocaleString()}</span>}
               {gameData.endDate && <span className="mr-4">Ends: {new Date(gameData.endDate).toLocaleString()}</span>}
               {gameData.players && <span className="mr-4">Commanders: {gameData.players.length}</span>}
-              {gameData.difficulty && <span>Difficulty: {gameData.difficulty}</span>}
+              {gameData.currentWeek && <span>Current Week: {gameData.currentWeek}</span>}
             </div>
           </div>
         )}
@@ -856,6 +1663,38 @@ const CommandCenter = () => {
         
         {/* Main Content */}
         <div className="p-6">
+          {/* Error Message Alert */}
+          {errorMessage && (
+            <div className="bg-red-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold mb-1">ERROR</h3>
+                <p>{errorMessage}</p>
+              </div>
+              <button 
+                onClick={() => setErrorMessage(null)}
+                className="text-white hover:text-red-300"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          
+          {/* Success Message Alert */}
+          {successMessage && (
+            <div className="bg-green-900 text-white px-6 py-4 rounded-lg mb-6 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold mb-1">SUCCESS</h3>
+                <p>{successMessage}</p>
+              </div>
+              <button 
+                onClick={() => setSuccessMessage(null)}
+                className="text-white hover:text-green-300"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          
           {activeTab === 'market' ? (
             renderMarketDashboard()
           ) : activeTab === 'battlefield' ? (
@@ -864,7 +1703,7 @@ const CommandCenter = () => {
             renderIntelligence()
           ) : (
             <>
-              {/* Original Command Center Content */}
+              {/* Command Center Content */}
               {/* Economic Status Alert */}
               <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
                 <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
@@ -875,6 +1714,24 @@ const CommandCenter = () => {
                 </p>
               </div>
               
+              {/* Weekly Moves Dashboard - NEW COMPONENT */}
+              {renderWeeklyMovesDashboard()}
+              
+              {/* Actions Remaining Indicator */}
+              <div className="flex justify-end mb-4">
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-400 mr-2">WEEK {currentWeek} ACTIONS REMAINING</span>
+                  <div className="flex space-x-1">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div 
+                        key={index} 
+                        className={`h-3 w-3 rounded-full ${index < (isEditingMoves ? 3 : actionsRemaining) ? 'bg-green-500' : 'bg-gray-600'}`}
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
               {renderCurrentAction()}
               
               <PlayerActions 
@@ -882,6 +1739,8 @@ const CommandCenter = () => {
                 playerId={playerId}
                 currentWeek={currentWeek}
                 soldiers={soldiers}
+                actionsRemaining={isEditingMoves ? 3 : actionsRemaining}
+                disabled={movesSubmitted && !isEditingMoves}
                 onActionSubmit={handleActionSubmit}
                 onViewMarket={handleViewMarket}
                 onViewBattlefield={handleViewBattlefield}
@@ -900,7 +1759,7 @@ const CommandCenter = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center h-full">
                   <div className="absolute top-4 left-4">
                     <h3 className="text-2xl font-bold military-header mb-2">ACTIVE BATTLEFIELD</h3>
-                    <p className="text-gray-300">12 Commanders in Battle</p>
+                    <p className="text-gray-300">{gameData?.players?.length || 12} Commanders in Battle</p>
                   </div>
                   <button 
                     onClick={() => setActiveTab('battlefield')}
@@ -909,44 +1768,19 @@ const CommandCenter = () => {
                     <span className="text-lg font-bold military-header">VIEW FULL BATTLEFIELD</span>
                     <div className="mt-1 text-sm text-gray-400 group-hover:text-gold transition-colors">Real-time battle updates available</div>
                   </button>
-                  <div className="absolute bottom-4 right-4 flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="text-sm text-gray-400">Battle Ends In</div>
-                      <div className="text-xl font-bold text-gold">04:23:15</div>
+                  {gameData?.endTime && (
+                    <div className="absolute bottom-4 right-4 flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-400">Battle Ends In</div>
+                        <div className="text-xl font-bold text-gold">04:23:15</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
               
               {/* Notifications & Updates */}
-              <div>
-                <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
-                <div className="space-y-4">
-                  <div className="notification p-4 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold">ATTACK ALERT</h4>
-                      <span className="text-sm text-gray-500">2 hours ago</span>
-                    </div>
-                    <p className="text-gray-400">Commander Eric has launched an attack against your forces. You lost 15 soldiers.</p>
-                  </div>
-                  
-                  <div className="notification p-4 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold">MARKET UPDATE</h4>
-                      <span className="text-sm text-gray-500">5 hours ago</span>
-                    </div>
-                    <p className="text-gray-400">Economic downturn has affected all markets. Your stock investments have lost value.</p>
-                  </div>
-                  
-                  <div className="notification p-4 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold">SPECIAL EVENT</h4>
-                      <span className="text-sm text-gray-500">1 day ago</span>
-                    </div>
-                    <p className="text-gray-400">Commander's Code Challenge is active! Post your leadership code on LinkedIn for bonus soldiers.</p>
-                  </div>
-                </div>
-              </div>
+              {renderIntelligenceBriefing()}
             </>
           )}
         </div>
