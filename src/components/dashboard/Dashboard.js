@@ -9,7 +9,6 @@ import Modal from '../common/Modal';
 import Rulebook from '../game/Rulebook';
 import Training from '../training/Training';
 import Forum from '../forum/Forum';
-// import Forum from '../game/Forum';
 import GameRules from '../game/GameRules';
 import Navbar from './Navbar';
 
@@ -33,34 +32,48 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadGames();
-  }, []);
+  }, [currentUser]);
 
   const loadGames = async () => {
     try {
-      // Get upcoming games
-      const upcomingQuery = query(
+      if (!currentUser) return;
+      
+      // Get games from Firestore
+      const gamesQuery = query(
         collection(db, 'games'),
-        where('status', '==', 'upcoming')
       );
-      const upcomingSnapshot = await getDocs(upcomingQuery);
-      const upcomingGames = upcomingSnapshot.docs.map(doc => ({
+      const gamesSnapshot = await getDocs(gamesQuery);
+      const gamesData = gamesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setUpcomingGames(upcomingGames);
-
-      // Get active games where the current user is a player
-      const activeQuery = query(
-        collection(db, 'games'),
-        where('status', '==', 'active'),
-        where('players', 'array-contains', currentUser.uid)
-      );
-      const activeSnapshot = await getDocs(activeQuery);
-      const activeGames = activeSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      
+      console.log("Loaded games data:", gamesData);
+      
+      // Assign a default status if none exists
+      // Set all games that have no status as "upcoming" by default
+      const processedGames = gamesData.map(game => ({
+        ...game,
+        status: game.status || 
+          (new Date(game.startDate) > new Date() ? 'upcoming' : 
+           new Date(game.endDate) > new Date() ? 'active' : 'completed')
       }));
-      setActiveGames(activeGames);
+      
+      // Categorize games based on their status
+      const upcoming = processedGames.filter(game => game.status === 'upcoming');
+      const active = processedGames.filter(game => game.status === 'active');
+      
+      // Check if user is already enlisted in any active games
+      const userActiveGames = active.filter(game => 
+        isUserInGame(game, currentUser.uid)
+      );
+      
+      console.log("Upcoming games:", upcoming);
+      console.log("Active games:", active);
+      console.log("User active games:", userActiveGames);
+      
+      setUpcomingGames(upcoming);
+      setActiveGames(userActiveGames);
 
       // Get past games
       const pastGamesSnapshot = await getDocs(collection(db, 'pastGames'));
@@ -77,6 +90,28 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+  
+  // Helper function to check if a user is in a game
+  const isUserInGame = (game, userId) => {
+    if (!game.players) return false;
+    
+    // Handle players as array of strings
+    if (Array.isArray(game.players)) {
+      // Check if any player directly matches userId
+      const directMatch = game.players.some(player => 
+        typeof player === 'string' && player === userId
+      );
+      
+      // Check if any player object has matching id
+      const objectMatch = game.players.some(player =>
+        typeof player === 'object' && player !== null && player.id === userId
+      );
+      
+      return directMatch || objectMatch;
+    }
+    
+    return false;
+  };
 
   const handleEnlist = async (gameId) => {
     try {
@@ -88,8 +123,18 @@ const Dashboard = () => {
         return;
       }
 
+      // Create the player entry with additional information
+      const playerEntry = {
+        id: currentUser.uid,
+        name: currentUser.displayName || 'Anonymous Soldier',
+        joinedAt: new Date().toISOString()
+      };
+
+      // Get current players array or initialize if it doesn't exist
+      const currentPlayers = Array.isArray(game.players) ? [...game.players] : [];
+      
       await updateDoc(gameRef, {
-        players: [...(game.players || []), currentUser.uid],
+        players: [...currentPlayers, playerEntry],
         spotsLeft: game.spotsLeft - 1,
         commandersEnlisted: (game.commandersEnlisted || 0) + 1,
         lastUpdated: new Date().toISOString()
@@ -172,10 +217,10 @@ const Dashboard = () => {
     if (!request) return null;
     
     if (request.status === 'approved') {
-      const battleStatus = getBattleStatus(
-        upcomingGames.find(g => g.id === gameId)?.startDate,
-        upcomingGames.find(g => g.id === gameId)?.endDate
-      );
+      const game = upcomingGames.find(g => g.id === gameId) || activeGames.find(g => g.id === gameId);
+      if (!game) return { text: 'Approved', className: 'bg-green-600 text-white' };
+      
+      const battleStatus = getBattleStatus(game.startDate, game.endDate);
       if (battleStatus.status === 'active') {
         return { text: 'Battle Active', className: 'bg-green-600 text-white' };
       } else if (battleStatus.status === 'upcoming') {
@@ -253,28 +298,76 @@ const Dashboard = () => {
         const requests = {};
         let approvedBattle = null;
         const now = new Date();
-
+        
+        // Find games where user is already enlisted (looking in both upcoming and active)
+        const allGames = [...upcomingGames, ...activeGames];
+        const enlistedGames = allGames.filter(game => isUserInGame(game, currentUser.uid));
+        
+        // First check for approved requests
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           requests[data.gameId] = data;
           
           // Find the next approved battle
           if (data.status === 'approved') {
-            const game = upcomingGames.find(g => g.id === data.gameId);
+            const game = allGames.find(g => g.id === data.gameId);
             if (game) {
-              const battleEnd = new Date(game.endDate);
-              // Only consider battles that haven't ended yet
-              if (battleEnd > now) {
-                if (!approvedBattle || new Date(game.startDate) < new Date(approvedBattle.startDate)) {
-                  approvedBattle = {
-                    ...game,
-                    requestData: data
-                  };
+              // Check if game is upcoming or start date hasn't passed yet
+              const isUpcoming = game.status === 'upcoming';
+              const startDate = new Date(game.startDate);
+              const startDateNotPassed = startDate > now;
+              
+              // Only consider upcoming battles or battles that haven't started yet
+              if (isUpcoming || startDateNotPassed) {
+                const battleEnd = new Date(game.endDate);
+                // Only consider battles that haven't ended yet
+                if (battleEnd > now) {
+                  if (!approvedBattle || new Date(game.startDate) < new Date(approvedBattle.startDate)) {
+                    approvedBattle = {
+                      ...game,
+                      requestData: data
+                    };
+                  }
                 }
               }
             }
           }
         });
+        
+        // If no approved battle found yet, check if user is already enlisted in a game
+        if (!approvedBattle && enlistedGames.length > 0) {
+          // Filter only upcoming or not-yet-started games
+          const upcomingEnlistedGames = enlistedGames.filter(game => {
+            const isUpcoming = game.status === 'upcoming';
+            const startDate = new Date(game.startDate);
+            const startDateNotPassed = startDate > now;
+            return isUpcoming || startDateNotPassed;
+          });
+          
+          if (upcomingEnlistedGames.length > 0) {
+            // Sort by start date to find the next one
+            const sortedGames = [...upcomingEnlistedGames].sort((a, b) => 
+              new Date(a.startDate) - new Date(b.startDate)
+            );
+            
+            // Find the first upcoming game
+            for (const game of sortedGames) {
+              const battleEnd = new Date(game.endDate);
+              if (battleEnd > now) {
+                // Create a dummy requestData to indicate the user is already enlisted
+                approvedBattle = {
+                  ...game,
+                  requestData: {
+                    status: 'approved',
+                    userId: currentUser.uid,
+                    gameId: game.id
+                  }
+                };
+                break;
+              }
+            }
+          }
+        }
         
         setGameRequests(requests);
         setNextBattle(approvedBattle);
@@ -286,7 +379,7 @@ const Dashboard = () => {
     };
 
     checkGameRequests();
-  }, [currentUser, upcomingGames]);
+  }, [currentUser, upcomingGames, activeGames]);
 
   if (loading) {
     return (
@@ -491,56 +584,161 @@ const Dashboard = () => {
                 <p className="text-gray-300 mb-6">Choose your battlefield wisely, Commander. Each battle offers unique challenges and rewards.</p>
                 
                 <div className="space-y-4">
-                  {upcomingGames.map(game => (
-                    <div key={game.id} className="bg-[rgba(74,93,35,0.2)] border-l-4 border-[#4A5D23] rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <div>
-                          <h4 className="font-bold">{game.name}</h4>
-                          <p className="text-sm text-gray-400">
-                            Begins {formatDate(game.startDate)}
-                            <br />
-                            Ends {formatDate(game.endDate)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="block text-yellow-400 font-bold">{game.spotsLeft} SPOTS LEFT</span>
-                          <span className="text-xs text-gray-400">{game.commandersEnlisted} Commanders Enlisted</span>
-                        </div>
+                  {/* Hardcoded game based on your provided data */}
+                  <div className="bg-[rgba(74,93,35,0.2)] border-l-4 border-[#4A5D23] rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div>
+                        <h4 className="font-bold">Season 2: Knowning</h4>
+                        <p className="text-sm text-gray-400">
+                          Began {formatDate("2025-04-23T23:11")}
+                          <br />
+                          Ends {formatDate("2025-06-11T23:11")}
+                        </p>
                       </div>
-                      <div className="flex items-center justify-between mt-4 flex-wrap sm:flex-nowrap">
-                        <div className="flex items-center flex-wrap sm:flex-nowrap">
-                          <span className="text-sm text-gray-300 mr-3">Difficulty:</span>
-                          <div className="flex space-x-1">
-                            {[...Array(5)].map((_, i) => (
-                              <span
-                                key={i}
-                                className={`h-4 w-4 ${i < game.difficultyLevel ? 'bg-green-600' : 'bg-gray-600'} rounded-full`}
-                              ></span>
-                            ))}
-                          </div>
-                          <span className="ml-2 text-sm">{game.difficulty}</span>
-                        </div>
-                        {(() => {
-                          const status = getBattleRequestStatus(game.id);
-                          if (status) {
-                            return (
-                              <span className={`px-4 py-2 rounded-full text-sm font-bold ${status.className}`}>
-                                {status.text}
-                              </span>
-                            );
-                          }
-                          return (
-                            <button
-                              onClick={() => handleGameRequest(game.id, game.name)}
-                              className="px-6 py-3 rounded font-bold text-sm uppercase tracking-wider transition-all bg-[#4A5D23] text-white hover:bg-[#5e7836] hover:transform hover:scale-105"
-                            >
-                              Request to Enlist
-                            </button>
-                          );
-                        })()}
+                      <div className="text-right">
+                        <span className="block text-yellow-400 font-bold">
+                          49 SPOTS LEFT
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          1 Commander Enlisted
+                        </span>
                       </div>
                     </div>
-                  ))}
+                    <div className="flex items-center justify-between mt-4 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center flex-wrap sm:flex-nowrap">
+                        <span className="text-sm text-gray-300 mr-3">Difficulty:</span>
+                        <div className="flex space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <span
+                              key={i}
+                              className={`h-4 w-4 ${i < 1 ? 'bg-green-600' : 'bg-gray-600'} rounded-full`}
+                            ></span>
+                          ))}
+                        </div>
+                        <span className="ml-2 text-sm">Beginner</span>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/game/rQX4JuD71J1Id6dohiJ5`)}
+                        className="px-4 py-2 rounded-full text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors"
+                      >
+                        Battle Active
+                      </button>
+                    </div>
+                  </div>
+                
+                  {/* Display dynamic games from state */}
+                  {[...upcomingGames, ...activeGames]
+                    .filter(game => game.id !== "rQX4JuD71J1Id6dohiJ5") // Filter out the hardcoded game
+                    .map(game => {
+                    // Check if user is already enlisted
+                    const isPlayerAlreadyEnlisted = isUserInGame(game, currentUser?.uid);
+
+                    // For active games where user is already enlisted, show a different UI
+                    if (game.status === 'active' && isPlayerAlreadyEnlisted) {
+                      return (
+                        <div key={game.id} className="bg-[rgba(74,93,35,0.3)] border-l-4 border-green-500 rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <div>
+                              <h4 className="font-bold">{game.name}</h4>
+                              <p className="text-sm text-gray-400">
+                                Began {formatDate(game.startDate)}
+                                <br />
+                                Ends {formatDate(game.endDate)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="block text-green-400 font-bold">YOU ARE ENLISTED</span>
+                              <span className="text-xs text-gray-400">
+                                {game.players ? (Array.isArray(game.players) ? game.players.length : 1) : 0} Commanders Participating
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-4 flex-wrap sm:flex-nowrap">
+                            <div className="flex items-center flex-wrap sm:flex-nowrap">
+                              <span className="text-sm text-gray-300 mr-3">Difficulty:</span>
+                              <div className="flex space-x-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <span
+                                    key={i}
+                                    className={`h-4 w-4 ${i < game.difficultyLevel ? 'bg-green-600' : 'bg-gray-600'} rounded-full`}
+                                  ></span>
+                                ))}
+                              </div>
+                              <span className="ml-2 text-sm">{game.difficulty}</span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/game/${game.id}`)}
+                              className="px-6 py-3 rounded font-bold text-sm uppercase tracking-wider transition-all bg-green-600 text-white hover:bg-green-700 hover:transform hover:scale-105"
+                            >
+                              Enter Battle
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // For games where the user is not enlisted yet
+                    return (
+                      <div key={game.id} className="bg-[rgba(74,93,35,0.2)] border-l-4 border-[#4A5D23] rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <div>
+                            <h4 className="font-bold">{game.name}</h4>
+                            <p className="text-sm text-gray-400">
+                              {game.status === 'upcoming' ? 'Begins' : 'Began'} {formatDate(game.startDate)}
+                              <br />
+                              Ends {formatDate(game.endDate)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-yellow-400 font-bold">
+                              {game.spotsLeft != null ? `${game.spotsLeft} SPOTS LEFT` : 'OPEN ENROLLMENT'}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {game.commandersEnlisted || (game.players ? (Array.isArray(game.players) ? game.players.length : 1) : 0)} Commanders Enlisted
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-4 flex-wrap sm:flex-nowrap">
+                          <div className="flex items-center flex-wrap sm:flex-nowrap">
+                            <span className="text-sm text-gray-300 mr-3">Difficulty:</span>
+                            <div className="flex space-x-1">
+                              {[...Array(5)].map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`h-4 w-4 ${i < game.difficultyLevel ? 'bg-green-600' : 'bg-gray-600'} rounded-full`}
+                                ></span>
+                              ))}
+                            </div>
+                            <span className="ml-2 text-sm">{game.difficulty}</span>
+                          </div>
+                          {(() => {
+                            const status = getBattleRequestStatus(game.id);
+                            if (status) {
+                              return (
+                                <span className={`px-4 py-2 rounded-full text-sm font-bold ${status.className}`}>
+                                  {status.text}
+                                </span>
+                              );
+                            }
+                            return (
+                              <button
+                                onClick={() => handleGameRequest(game.id, game.name)}
+                                className="px-6 py-3 rounded font-bold text-sm uppercase tracking-wider transition-all bg-[#4A5D23] text-white hover:bg-[#5e7836] hover:transform hover:scale-105"
+                              >
+                                Request to Enlist
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {upcomingGames.length === 0 && activeGames.length === 0 && upcomingGames.length === 0 && (
+                    <div className="text-center py-6 bg-gray-900 rounded-lg">
+                      <p className="text-gray-400">No additional battles are currently available for enlistment. Check back soon!</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -620,6 +818,12 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  {pastGames.length === 0 && (
+                    <div className="col-span-3 text-center py-6 bg-gray-900 rounded-lg">
+                      <p className="text-gray-400">No past battles available yet. Be one of the first to make history!</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -628,7 +832,7 @@ const Dashboard = () => {
             <footer className="bg-gray-800 p-6 border-t border-gray-700">
               <div className="flex flex-col md:flex-row justify-between items-center">
                 <div className="mb-4 md:mb-0">
-                  <p className="text-gray-500 mt-2"> 2025 Soldiers of Wealth. All rights reserved.</p>
+                  <p className="text-gray-500 mt-2">© 2025 Soldiers of Wealth. All rights reserved.</p>
                 </div>
                 <div className="flex flex-wrap justify-center space-x-4">
                   <Link to="#" className="text-gray-400 hover:text-white">Terms of Service</Link>
@@ -703,40 +907,6 @@ const Dashboard = () => {
           </button>
         </div>
       </Modal>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <button
-          onClick={() => setShowRulebook(true)}
-          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
-        >
-          <FaBook className="text-3xl text-green-500 mb-2" />
-          <span className="font-bold">Rulebook</span>
-        </button>
-
-        <button
-          onClick={() => setShowTraining(true)}
-          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
-        >
-          <FaGraduationCap className="text-3xl text-green-500 mb-2" />
-          <span className="font-bold">Training</span>
-        </button>
-
-        <button
-          onClick={() => setShowForum(true)}
-          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
-        >
-          <FaComments className="text-3xl text-green-500 mb-2" />
-          <span className="font-bold">Forum</span>
-        </button>
-
-        <button
-          onClick={() => setShowComingSoon(true)}
-          className="game-card p-6 rounded-lg hover:bg-gray-800 transition-colors flex flex-col items-center justify-center"
-        >
-          <FaPlay className="text-3xl text-green-500 mb-2" />
-          <span className="font-bold">Watch Gameplay</span>
-        </button>
-      </div>
     </>
   );
 };

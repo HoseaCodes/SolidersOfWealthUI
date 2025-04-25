@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import PlayerActions from './PlayerActions';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import ResponsiveNavbar from './Navbar';
 
 const CommandCenter = () => {
+  const { gameId } = useParams(); // Get the gameId from URL parameters
   const [activeTab, setActiveTab] = useState('command');
   const [currentWeek, setCurrentWeek] = useState(1);
   const [soldiers, setSoldiers] = useState(165);
@@ -18,10 +20,42 @@ const CommandCenter = () => {
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attackSoldiers, setAttackSoldiers] = useState(50);
+  const [gameData, setGameData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { currentUser } = useAuth();
   const db = getFirestore();
   const playerId = currentUser?.uid;
 
+  // Load game data based on gameId
+  useEffect(() => {
+    const loadGameData = async () => {
+      if (gameId) {
+        try {
+          setLoading(true);
+          const gameDocRef = doc(db, 'games', gameId);
+          const gameDoc = await getDoc(gameDocRef);
+          
+          if (gameDoc.exists()) {
+            setGameData({
+              id: gameDoc.id,
+              ...gameDoc.data()
+            });
+          } else {
+            console.error('Game not found');
+            // Handle game not found error
+          }
+        } catch (error) {
+          console.error('Error loading game data:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadGameData();
+  }, [gameId, db]);
+  
+  // Default players data
   const players = [
     {
       id: 'you',
@@ -231,7 +265,7 @@ const CommandCenter = () => {
         <div className="game-card p-6 rounded-lg bg-gray-800/50 border border-gray-700">
           <h3 className="text-xl font-bold military-header mb-4">BATTLEFIELD ACTIONS</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {players.filter(p => p.id !== playerId).map(player => (
+            {players.filter(p => p.id !== 'you').map(player => (
               <div key={player.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -551,7 +585,7 @@ const CommandCenter = () => {
   };
 
   const [intelligenceTab, setIntelligenceTab] = useState('leaderboard');
-  const [playerStats, setPlayerStats] = useState({
+  const [playerStatsData, setPlayerStatsData] = useState({
     soldierGrowth: 15,
     attackSuccess: 60,
     defenseRate: 75,
@@ -591,7 +625,7 @@ const CommandCenter = () => {
                   index === 0 ? 'rank-1' :
                   index === 1 ? 'rank-2' :
                   index === 2 ? 'rank-3' :
-                  player.id === currentUser?.uid ? 'rank-you' : ''
+                  player.id === 'you' ? 'rank-you' : ''
                 }`}>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
@@ -605,9 +639,9 @@ const CommandCenter = () => {
                       <img src="/images/avatar.png" alt="Player Avatar" className="h-10 w-10 rounded-full mr-3" />
                       <div>
                         <div className="flex items-center">
-                          <h5 className="font-bold">{player.id === currentUser?.uid ? 'YOU' : player.name}</h5>
+                          <h5 className="font-bold">{player.id === 'you' ? 'YOU' : player.name}</h5>
                         </div>
-                        <p className="text-sm text-gray-400">Commander {player.commanderTitle}</p>
+                        <p className="text-sm text-gray-400">Commander {player.title}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -634,7 +668,7 @@ const CommandCenter = () => {
             {Object.entries(weeklyHighlights).map(([key, highlight]) => (
               <div key={key} className="game-card p-4 rounded-lg">
                 <h5 className="font-bold mb-2 text-center">
-                  {key.split(/(?=[A-Z])/).join(' ').toUpperCase()}
+                {key.split(/(?=[A-Z])/).join(' ').toUpperCase()}
                 </h5>
                 <div className="flex flex-col items-center">
                   <img src="/images/avatar.png" alt="Player Avatar" className="h-16 w-16 rounded-full mb-2" />
@@ -655,25 +689,25 @@ const CommandCenter = () => {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="stat-card stat-up p-3 rounded-lg text-center">
               <p className="text-sm text-gray-400">SOLDIER GROWTH</p>
-              <p className="text-2xl font-bold">+{playerStats.soldierGrowth}%</p>
+              <p className="text-2xl font-bold">+{playerStatsData.soldierGrowth}%</p>
               <p className="text-xs text-gray-500">WEEK-OVER-WEEK</p>
             </div>
             
-            <div className={`stat-card ${playerStats.attackSuccess >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+            <div className={`stat-card ${playerStatsData.attackSuccess >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
               <p className="text-sm text-gray-400">ATTACK SUCCESS</p>
-              <p className="text-2xl font-bold">{playerStats.attackSuccess}%</p>
-              <p className="text-xs text-gray-500">{playerStats.successfulAttacks} OF {playerStats.totalAttacks} ATTACKS</p>
+              <p className="text-2xl font-bold">{playerStatsData.attackSuccess}%</p>
+              <p className="text-xs text-gray-500">{playerStatsData.successfulAttacks} OF {playerStatsData.totalAttacks} ATTACKS</p>
             </div>
             
-            <div className={`stat-card ${playerStats.defenseRate >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+            <div className={`stat-card ${playerStatsData.defenseRate >= 50 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
               <p className="text-sm text-gray-400">DEFENSE RATE</p>
-              <p className="text-2xl font-bold">{playerStats.defenseRate}%</p>
-              <p className="text-xs text-gray-500">{playerStats.successfulDefenses} OF {playerStats.totalDefenses} DEFENSES</p>
+              <p className="text-2xl font-bold">{playerStatsData.defenseRate}%</p>
+              <p className="text-xs text-gray-500">{playerStatsData.successfulDefenses} OF {playerStatsData.totalDefenses} DEFENSES</p>
             </div>
             
-            <div className={`stat-card ${playerStats.investmentROI >= 0 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
+            <div className={`stat-card ${playerStatsData.investmentROI >= 0 ? 'stat-up' : 'stat-down'} p-3 rounded-lg text-center`}>
               <p className="text-sm text-gray-400">INVESTMENT ROI</p>
-              <p className="text-2xl font-bold">{playerStats.investmentROI}%</p>
+              <p className="text-2xl font-bold">{playerStatsData.investmentROI}%</p>
               <p className="text-xs text-gray-500">AVERAGE RETURN</p>
             </div>
           </div>
@@ -763,11 +797,34 @@ const CommandCenter = () => {
     );
   };
 
+  // Show loading state if we're waiting for game data
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1a2639] flex items-center justify-center">
+        <div className="text-white text-xl">Loading battle data...</div>
+      </div>
+    );
+  }
+
   return (
     <section id="command-center" className="p-6 mb-16">
       <div className="max-w-6xl mx-auto bg-gray-900 rounded-lg overflow-hidden shadow-2xl">
         {/* Top Navigation Bar */}
         <ResponsiveNavbar />
+        
+        {/* Game Information Banner */}
+        {gameData && (
+          <div className="px-6 pt-4 pb-2 bg-gradient-to-r from-gray-800 to-gray-900">
+            <h2 className="text-2xl font-bold text-[#D4AF37]">{gameData.name}</h2>
+            <div className="flex flex-wrap items-center text-sm text-gray-400 mt-1">
+              <span className="mr-4">Battle ID: {gameId}</span>
+              {gameData.startDate && <span className="mr-4">Begins: {new Date(gameData.startDate).toLocaleString()}</span>}
+              {gameData.endDate && <span className="mr-4">Ends: {new Date(gameData.endDate).toLocaleString()}</span>}
+              {gameData.players && <span className="mr-4">Commanders: {gameData.players.length}</span>}
+              {gameData.difficulty && <span>Difficulty: {gameData.difficulty}</span>}
+            </div>
+          </div>
+        )}
         
         {/* Command Center Tabs */}
         <div className="flex border-b border-gray-700">
@@ -798,90 +855,101 @@ const CommandCenter = () => {
         </div>
         
         {/* Main Content */}
-        {activeTab === 'market' ? renderMarketDashboard() : activeTab === 'battlefield' ? renderBattlefield() : activeTab === 'intelligence' ? renderIntelligence() : (
-          <div className="p-6">
-            {/* Original Command Center Content */}
-            {/* Economic Status Alert */}
-            <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
-              <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
-              <p className="text-gray-400">
-                Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
-                Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
-                Business {marketStatus.business}%
-              </p>
-            </div>
-            
-            {renderCurrentAction()}
-            
-            <PlayerActions 
-              gameId="current-game"
-              playerId={currentUser?.uid}
-              currentWeek={currentWeek}
-              soldiers={soldiers}
-              onActionSubmit={handleActionSubmit}
-              onViewMarket={handleViewMarket}
-              onViewBattlefield={handleViewBattlefield}
-            />
-            
-            {/* Game Board Visual */}
-            <div 
-              id="gameBoard" 
-              className="rounded-lg overflow-hidden mb-8 relative h-80 bg-cover bg-center group"
-              style={{
-                backgroundImage: 'url("/images/battlefield_preview.jpg")',
-                backgroundBlendMode: 'overlay',
-                backgroundColor: 'rgba(0, 0, 0, 0.4)'
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center h-full">
-                <div className="absolute top-4 left-4">
-                  <h3 className="text-2xl font-bold military-header mb-2">ACTIVE BATTLEFIELD</h3>
-                  <p className="text-gray-300">12 Commanders in Battle</p>
-                </div>
-                <button className="px-8 py-4 bg-gray-900/80 text-white rounded-lg border-2 border-white hover:bg-gray-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-gold/20 group">
-                  <span className="text-lg font-bold military-header">VIEW FULL BATTLEFIELD</span>
-                  <div className="mt-1 text-sm text-gray-400 group-hover:text-gold transition-colors">Real-time battle updates available</div>
-                </button>
-                <div className="absolute bottom-4 right-4 flex items-center space-x-4">
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">Battle Ends In</div>
-                    <div className="text-xl font-bold text-gold">04:23:15</div>
+        <div className="p-6">
+          {activeTab === 'market' ? (
+            renderMarketDashboard()
+          ) : activeTab === 'battlefield' ? (
+            renderBattlefield()
+          ) : activeTab === 'intelligence' ? (
+            renderIntelligence()
+          ) : (
+            <>
+              {/* Original Command Center Content */}
+              {/* Economic Status Alert */}
+              <div className="economy-downturn px-6 py-4 rounded-lg mb-6">
+                <h3 className="text-xl font-bold mb-1">ECONOMIC DOWNTURN</h3>
+                <p className="text-gray-400">
+                  Markets are unstable. Proceed with caution. Stocks {marketStatus.stocks}%, 
+                  Real Estate {marketStatus.realEstate}%, Crypto {marketStatus.crypto}%, 
+                  Business {marketStatus.business}%
+                </p>
+              </div>
+              
+              {renderCurrentAction()}
+              
+              <PlayerActions 
+                gameId={gameId || "current-game"}
+                playerId={playerId}
+                currentWeek={currentWeek}
+                soldiers={soldiers}
+                onActionSubmit={handleActionSubmit}
+                onViewMarket={handleViewMarket}
+                onViewBattlefield={handleViewBattlefield}
+              />
+              
+              {/* Game Board Visual */}
+              <div 
+                id="gameBoard" 
+                className="rounded-lg overflow-hidden mb-8 relative h-80 bg-cover bg-center group"
+                style={{
+                  backgroundImage: 'url("/images/battlefield_preview.jpg")',
+                  backgroundBlendMode: 'overlay',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)'
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center h-full">
+                  <div className="absolute top-4 left-4">
+                    <h3 className="text-2xl font-bold military-header mb-2">ACTIVE BATTLEFIELD</h3>
+                    <p className="text-gray-300">12 Commanders in Battle</p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('battlefield')}
+                    className="px-8 py-4 bg-gray-900/80 text-white rounded-lg border-2 border-white hover:bg-gray-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-gold/20 group"
+                  >
+                    <span className="text-lg font-bold military-header">VIEW FULL BATTLEFIELD</span>
+                    <div className="mt-1 text-sm text-gray-400 group-hover:text-gold transition-colors">Real-time battle updates available</div>
+                  </button>
+                  <div className="absolute bottom-4 right-4 flex items-center space-x-4">
+                    <div className="text-right">
+                      <div className="text-sm text-gray-400">Battle Ends In</div>
+                      <div className="text-xl font-bold text-gold">04:23:15</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Notifications & Updates */}
-            <div>
-              <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
-              <div className="space-y-4">
-                <div className="notification p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold">ATTACK ALERT</h4>
-                    <span className="text-sm text-gray-500">2 hours ago</span>
+              
+              {/* Notifications & Updates */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">INTELLIGENCE BRIEFING</h3>
+                <div className="space-y-4">
+                  <div className="notification p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-bold">ATTACK ALERT</h4>
+                      <span className="text-sm text-gray-500">2 hours ago</span>
+                    </div>
+                    <p className="text-gray-400">Commander Eric has launched an attack against your forces. You lost 15 soldiers.</p>
                   </div>
-                  <p className="text-gray-400">Commander Eric has launched an attack against your forces. You lost 15 soldiers.</p>
-                </div>
-                
-                <div className="notification p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold">MARKET UPDATE</h4>
-                    <span className="text-sm text-gray-500">5 hours ago</span>
+                  
+                  <div className="notification p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-bold">MARKET UPDATE</h4>
+                      <span className="text-sm text-gray-500">5 hours ago</span>
+                    </div>
+                    <p className="text-gray-400">Economic downturn has affected all markets. Your stock investments have lost value.</p>
                   </div>
-                  <p className="text-gray-400">Economic downturn has affected all markets. Your stock investments have lost value.</p>
-                </div>
-                
-                <div className="notification p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold">SPECIAL EVENT</h4>
-                    <span className="text-sm text-gray-500">1 day ago</span>
+                  
+                  <div className="notification p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-bold">SPECIAL EVENT</h4>
+                      <span className="text-sm text-gray-500">1 day ago</span>
+                    </div>
+                    <p className="text-gray-400">Commander's Code Challenge is active! Post your leadership code on LinkedIn for bonus soldiers.</p>
                   </div>
-                  <p className="text-gray-400">Commander's Code Challenge is active! Post your leadership code on LinkedIn for bonus soldiers.</p>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </section>
   );
