@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
-const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit, onViewMarket, onViewBattlefield }) => {
+const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, actionsRemaining, disabled, onActionSubmit, onViewMarket, onViewBattlefield }) => {
   const [selectedActions, setSelectedActions] = useState({
     investment: null,
     offensive: null,
@@ -60,6 +60,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
     }
   };
 
+  // Allow selecting multiple actions from the same category
   const handleActionSelect = (category, action) => {
     setSelectedActions(prev => ({
       ...prev,
@@ -72,35 +73,85 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
         ...prev,
         [category]: ''
       }));
-      if (category === 'investment') {
-        onActionSubmit(null); // Clear current deployment display
-      }
     }
 
+    // Update current action with the selection
+    updateCurrentAction(category, action);
+  };
+
+  // Helper to update the current action with new selections
+  const updateCurrentAction = (category, action, marketValue = null, amountValue = null, targetValue = null) => {
+    let actionData = null;
+    
+    // Build the action data based on category
     if (category === 'investment') {
-      setInvestmentAmount(10);
-      // If selecting invest action, update display with current amount
+      // For investment actions
       if (action.id === 'invest') {
-        onActionSubmit({
+        actionData = {
           investment: {
-            type: 'invest',
-            amount: 10, // Default amount
-            market: selectedMarkets[category] // Keep current market if exists
-          },
-          offensive: currentAction?.offensive // Keep offensive data
-        });
+            type: action.id,
+            amount: amountValue !== null ? amountValue : investmentAmount,
+            market: marketValue !== null ? marketValue : selectedMarkets.investment
+          }
+        };
+      } else {
+        actionData = {
+          investment: {
+            type: action.id
+          }
+        };
       }
     } else if (category === 'offensive') {
-      // Add offensive data to current action
-      onActionSubmit({
-        investment: currentAction?.investment, // Keep investment data
-        offensive: {
-          type: action.id,
-          targetPlayer: targetPlayer,
-          market: selectedMarkets[category]
-        }
-      });
+      // For offensive actions
+      if (['attack', 'spy'].includes(action.id)) {
+        // Find the target player to get their name
+        const targetPlayerObj = otherPlayers.find(p => p.id === (targetValue !== null ? targetValue : targetPlayer));
+        const targetName = targetPlayerObj ? (targetPlayerObj.displayName || targetPlayerObj.name) : 'Unknown Commander';
+        
+        actionData = {
+          offensive: {
+            type: action.id,
+            targetPlayer: targetValue !== null ? targetValue : targetPlayer,
+            targetName: targetName
+          }
+        };
+      } else if (action.id === 'manipulate') {
+        actionData = {
+          offensive: {
+            type: action.id,
+            market: marketValue !== null ? marketValue : selectedMarkets.offensive
+          }
+        };
+      } else {
+        actionData = {
+          offensive: {
+            type: action.id
+          }
+        };
+      }
+    } else if (category === 'defensive') {
+      // For defensive actions
+      if (action.id === 'insurance') {
+        actionData = {
+          defensive: {
+            type: action.id,
+            market: marketValue !== null ? marketValue : selectedMarkets.defensive
+          }
+        };
+      } else {
+        actionData = {
+          defensive: {
+            type: action.id
+          }
+        };
+      }
     }
+    
+    // Don't submit if we don't have an action
+    if (!actionData) return;
+    
+    // Set current action locally
+    setCurrentAction(actionData);
   };
 
   const handleMarketSelect = (category, market) => {
@@ -109,146 +160,199 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
       [category]: market
     }));
     
-    // Notify parent of investment selection
-    if (category === 'investment' && selectedActions[category]?.id === 'invest') {
-      onActionSubmit({
-        investment: {
-          type: 'invest',
-          amount: investmentAmount,
-          market: market
-        },
-        offensive: currentAction?.offensive // Keep offensive data
-      });
-    } else if (category === 'offensive' && selectedActions[category]) {
-      onActionSubmit({
-        investment: currentAction?.investment, // Keep investment data
-        offensive: {
-          type: selectedActions[category].id,
-          targetPlayer: targetPlayer,
-          market: market
-        }
-      });
+    // Update action with new market selection
+    if (selectedActions[category]) {
+      updateCurrentAction(category, selectedActions[category], market);
     }
   };
 
   const handleInvestmentAmountChange = (newAmount) => {
     setInvestmentAmount(newAmount);
-    // Update deployment display with new amount
-    if (selectedActions.investment?.id === 'invest' && selectedMarkets.investment) {
-      onActionSubmit({
-        investment: {
-          type: 'invest',
-          amount: newAmount,
-          market: selectedMarkets.investment
-        },
-        offensive: currentAction?.offensive // Keep offensive data
-      });
+    
+    // Update action with new amount
+    if (selectedActions.investment && selectedActions.investment.id === 'invest') {
+      updateCurrentAction('investment', selectedActions.investment, null, newAmount);
     }
   };
 
   const handleTargetPlayerSelect = (playerId) => {
     setTargetPlayer(playerId);
-    if (selectedActions.offensive) {
-      onActionSubmit({
-        investment: currentAction?.investment, // Keep investment data
-        offensive: {
-          type: selectedActions.offensive.id,
-          targetPlayer: playerId,
-          market: selectedMarkets.offensive
-        }
-      });
+    
+    // Update action with new target player
+    if (selectedActions.offensive && ['attack', 'spy'].includes(selectedActions.offensive.id)) {
+      updateCurrentAction('offensive', selectedActions.offensive, null, null, playerId);
     }
   };
 
-  const validateActions = () => {
-    if (!selectedActions.investment || !selectedActions.offensive || !selectedActions.defensive) {
-      return 'Please select one action from each category';
+  // Validate the action before submitting
+  const validateAction = (actionData) => {
+    const category = actionData.investment ? 'investment' : 
+                    actionData.offensive ? 'offensive' : 'defensive';
+    const action = actionData[category];
+    
+    if (actionsRemaining <= 0 && !disabled) {
+      return "No actions remaining this week";
     }
-
-    if (selectedActions.investment.id === 'invest' && investmentAmount < 10) {
-      return 'Minimum investment is 10 soldiers';
+    
+    if (category === 'investment' && action.type === 'invest') {
+      if (!action.market) {
+        return "Please select a market for your investment";
+      }
+      
+      if (action.amount < 10) {
+        return "Minimum investment is 10 soldiers";
+      }
+      
+      if (action.amount > soldiers) {
+        return "You don't have enough soldiers for this investment";
+      }
     }
-
-    if (selectedActions.investment.id === 'invest' && investmentAmount > soldiers) {
-      return 'You don\'t have enough soldiers';
+    
+    if (category === 'offensive') {
+      if (['attack', 'spy'].includes(action.type) && !action.targetPlayer) {
+        return "Please select a target player";
+      }
+      
+      if (action.type === 'manipulate' && !action.market) {
+        return "Please select a market to manipulate";
+      }
     }
-
-    if (['attack', 'spy'].includes(selectedActions.offensive.id) && !targetPlayer) {
-      return 'Please select a target player';
+    
+    if (category === 'defensive' && action.type === 'insurance' && !action.market) {
+      return "Please select a market to secure";
     }
-
-    // Validate market selection
-    if (selectedActions.investment.markets && !selectedMarkets.investment) {
-      return 'Please select a market for your investment action';
-    }
-    if (selectedActions.offensive.markets && !selectedMarkets.offensive) {
-      return 'Please select a market for your offensive action';
-    }
-    if (selectedActions.defensive.markets && !selectedMarkets.defensive) {
-      return 'Please select a market for your defensive action';
-    }
-
+    
     return null;
   };
 
-  const handleSubmit = async (e) => {
+  // Handle the execution of an action
+  const handleExecuteAction = (e, category) => {
     e.preventDefault();
-    const validationError = validateActions();
-    if (validationError) {
-      setError(validationError);
+    
+    // Check if we're at max moves or no actions remaining
+    if (actionsRemaining <= 0 && !disabled) {
+      setError("No actions remaining this week");
       return;
     }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const actionData = {
-        playerId,
-        gameId,
-        week: currentWeek,
-        timestamp: new Date().toISOString(),
-        investment: {
-          type: selectedActions.investment.id,
-          amount: investmentAmount,
-          market: selectedMarkets.investment
-        },
-        offensive: {
-          type: selectedActions.offensive.id,
-          targetPlayer: targetPlayer,
-          market: selectedMarkets.offensive
-        },
-        defensive: {
-          type: selectedActions.defensive.id,
-          market: selectedMarkets.defensive
+    
+    if (disabled) {
+      setError("Your moves for this week have been submitted. Edit your moves to make changes.");
+      return;
+    }
+    
+    // Get current action details
+    const action = selectedActions[category];
+    if (!action) {
+      setError(`Please select an action from ${category}`);
+      return;
+    }
+    
+    // Create action data
+    let actionData = {};
+    
+    if (category === 'investment') {
+      if (action.id === 'invest') {
+        if (!selectedMarkets.investment) {
+          setError("Please select a market for your investment");
+          return;
         }
-      };
-
-      await addDoc(collection(db, 'playerActions'), actionData);
-      
-      // Notify parent component of the action
-      if (onActionSubmit) {
-        onActionSubmit(actionData);
+        
+        actionData = {
+          investment: {
+            type: action.id,
+            amount: investmentAmount,
+            market: selectedMarkets.investment
+          }
+        };
+      } else {
+        actionData = {
+          investment: {
+            type: action.id
+          }
+        };
       }
-      
-      setSelectedActions({
-        investment: null,
-        offensive: null,
-        defensive: null
-      });
-      setSelectedMarkets({
-        investment: '',
-        offensive: '',
-        defensive: ''
-      });
+    } else if (category === 'offensive') {
+      if (['attack', 'spy'].includes(action.id)) {
+        if (!targetPlayer) {
+          setError("Please select a target player");
+          return;
+        }
+        
+        // Find the target player to get their name
+        const targetPlayerObj = otherPlayers.find(p => p.id === targetPlayer);
+        const targetName = targetPlayerObj ? (targetPlayerObj.displayName || targetPlayerObj.name) : 'Unknown Commander';
+        
+        actionData = {
+          offensive: {
+            type: action.id,
+            targetPlayer: targetPlayer,
+            targetName: targetName
+          }
+        };
+      } else if (action.id === 'manipulate') {
+        if (!selectedMarkets.offensive) {
+          setError("Please select a market to manipulate");
+          return;
+        }
+        
+        actionData = {
+          offensive: {
+            type: action.id,
+            market: selectedMarkets.offensive
+          }
+        };
+      } else {
+        actionData = {
+          offensive: {
+            type: action.id
+          }
+        };
+      }
+    } else if (category === 'defensive') {
+      if (action.id === 'insurance') {
+        if (!selectedMarkets.defensive) {
+          setError("Please select a market to secure");
+          return;
+        }
+        
+        actionData = {
+          defensive: {
+            type: action.id,
+            market: selectedMarkets.defensive
+          }
+        };
+      } else {
+        actionData = {
+          defensive: {
+            type: action.id
+          }
+        };
+      }
+    }
+    
+    // Clear error
+    setError('');
+    
+    // Submit the action to parent component
+    if (onActionSubmit) {
+      onActionSubmit(actionData);
+    }
+    
+    // Reset the selection for this category
+    setSelectedActions(prev => ({
+      ...prev,
+      [category]: null
+    }));
+    
+    setSelectedMarkets(prev => ({
+      ...prev,
+      [category]: ''
+    }));
+    
+    if (category === 'investment') {
       setInvestmentAmount(10);
+    } else if (category === 'offensive' && ['attack', 'spy'].includes(action.id)) {
       setTargetPlayer('');
-      
-    } catch (error) {
-      console.error('Error submitting actions:', error);
-      setError('Failed to submit actions. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -296,6 +400,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
                   ? `${action.buttonClass} shadow-lg`
                   : 'bg-gray-700/50 hover:bg-gray-600/50'
               }`}
+              disabled={actionsRemaining <= 0 || disabled}
             >
               <div className="text-left">
                 <div className="font-bold">{action.name}</div>
@@ -313,6 +418,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
                 className="bg-gray-700/50 p-2 rounded border border-gray-600 text-sm"
                 value={selectedMarkets[category]}
                 onChange={(e) => handleMarketSelect(category, e.target.value)}
+                disabled={actionsRemaining <= 0 || disabled}
               >
                 <option value="">SELECT TARGET MARKET</option>
                 {action.markets.map(market => (
@@ -333,8 +439,9 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
                   min="10"
                   max={soldiers}
                   value={investmentAmount}
-                  onChange={(e) => handleInvestmentAmountChange(e.target.value)}
+                  onChange={(e) => handleInvestmentAmountChange(parseInt(e.target.value) || 10)}
                   className="bg-gray-800 p-2 rounded w-24 border border-gray-600 text-center font-bold"
+                  disabled={actionsRemaining <= 0 || disabled}
                 />
               </div>
             )}
@@ -345,6 +452,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
                 className="bg-gray-700/50 p-2 rounded border border-gray-600 text-sm"
                 value={targetPlayer}
                 onChange={(e) => handleTargetPlayerSelect(e.target.value)}
+                disabled={actionsRemaining <= 0 || disabled}
               >
                 <option value="">SELECT TARGET COMMANDER</option>
                 {otherPlayers.map(player => (
@@ -354,6 +462,21 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
                 ))}
               </select>
             )}
+            
+            {/* Execute Action button for each selected action */}
+            {selectedActions[category]?.id === action.id && (
+              <button
+                type="button"
+                onClick={(e) => handleExecuteAction(e, category)}
+                className={`w-full py-2 px-4 rounded bg-green-700 hover:bg-green-600 transition-all duration-300 ${
+                  actionsRemaining <= 0 || disabled ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={actionsRemaining <= 0 || disabled}
+              >
+                EXECUTE {action.name}
+                {actionsRemaining <= 0 ? ' (NO ACTIONS LEFT)' : disabled ? ' (MOVES SUBMITTED)' : ''}
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -361,7 +484,7 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       {error && (
         <div className="notification p-4 rounded-lg bg-red-900/50 border border-red-700">
           <div className="flex items-center mb-2">
@@ -385,19 +508,19 @@ const PlayerActions = ({ gameId, playerId, currentWeek, soldiers, onActionSubmit
             <div className="text-xl font-bold text-white">{soldiers} SOLDIERS</div>
           </div>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className={`px-8 py-4 rounded-lg text-white font-bold transition-all duration-300 ${
-            loading
-              ? 'bg-gray-600 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20'
-          }`}
-        >
-          {loading ? 'EXECUTING...' : 'CONFIRM BATTLE PLAN'}
-        </button>
+        <div className="flex items-center bg-gray-700/50 px-4 py-2 rounded-lg">
+          <span className="text-sm text-gray-400 mr-2">ACTIONS REMAINING</span>
+          <div className="flex space-x-1">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div 
+                key={index} 
+                className={`h-3 w-3 rounded-full ${index < actionsRemaining ? 'bg-green-500' : 'bg-gray-600'}`}
+              ></div>
+            ))}
+          </div>
+        </div>
       </div>
-    </form>
+    </div>
   );
 };
 
