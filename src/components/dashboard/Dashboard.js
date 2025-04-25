@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getFirestore, collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { FaBook, FaGraduationCap, FaComments, FaPlay, FaClock, FaCheckCircle, FaHourglassHalf, FaLock } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -225,7 +225,9 @@ const Dashboard = () => {
       };
 
       const requestId = `${currentUser.uid}-${gameId}-${Date.now()}`;
-      await updateDoc(doc(db, 'joinRequests', requestId), requestData);
+      
+      // Use setDoc instead of updateDoc to create the document
+      await setDoc(doc(db, 'joinRequests', requestId), requestData);
       
       setGameRequests(prev => ({
         ...prev,
@@ -284,7 +286,7 @@ const Dashboard = () => {
     };
 
     checkGameRequests();
-  }, [currentUser]);
+  }, [currentUser, upcomingGames]);
 
   if (loading) {
     return (

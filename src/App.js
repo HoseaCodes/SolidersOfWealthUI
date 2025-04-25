@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { EconomicProvider } from './components/admin/contexts/EconomicContext';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import GameRoute from './components/auth/GameRoute';
 import LandingPage from './components/landing/LandingPage';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
@@ -36,7 +37,9 @@ function App() {
               } />
               <Route path="/commandcenter" element={
                 <PrivateRoute>
-                  <CommandCenter />
+                  <GameRoute>
+                    <CommandCenter />
+                  </GameRoute>
                 </PrivateRoute>
               } />
               <Route path="/profile" element={

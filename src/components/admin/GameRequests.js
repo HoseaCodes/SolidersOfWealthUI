@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 
 const GameRequests = () => {
   const [requests, setRequests] = useState([]);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const db = getFirestore();
 
   useEffect(() => {
@@ -11,7 +12,7 @@ const GameRequests = () => {
 
   const loadRequests = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'gameRequests'));
+      const querySnapshot = await getDocs(collection(db, 'joinRequests'));
       const requestsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -19,64 +20,143 @@ const GameRequests = () => {
       setRequests(requestsData);
     } catch (error) {
       console.error('Error loading game requests:', error);
+      showNotification('Failed to load game requests', 'error');
     }
+  };
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+    
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: '' });
+    }, 5000);
+  };
+
+  // Helper function to validate request data before saving
+  const validateRequestData = (request) => {
+    // Check if all required fields exist
+    if (!request.userId || !request.displayName || !request.gameId || !request.gameName) {
+      throw new Error('Missing required player information');
+    }
+    
+    return {
+      userId: request.userId,
+      displayName: request.displayName,
+      gameId: request.gameId,
+      gameName: request.gameName
+    };
   };
 
   const handleApprove = async (request) => {
     try {
-      // Create new game
-      const gameData = {
-        players: [
-          { id: request.fromPlayerId, name: request.fromPlayerName },
-          { id: request.toPlayerId, name: request.toPlayerName }
-        ],
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
-      };
-
-      // Add game to games collection
-      await addDoc(collection(db, 'games'), gameData);
+      // Validate request data first
+      const validatedData = validateRequestData(request);
+      
+      // Get the current game document to update player information
+      const gameRef = doc(db, 'games', validatedData.gameId);
+      
+      // Get the existing document to update
+      const gameDocSnap = await getDoc(gameRef);
+      
+      if (!gameDocSnap.exists()) {
+        throw new Error(`Game ${validatedData.gameName} no longer exists`);
+      }
+      
+      const gameDoc = gameDocSnap.data();
+      
+      // Add the player to the game's players array
+      const updatedPlayers = [...(gameDoc.players || []), {
+        id: validatedData.userId,
+        name: validatedData.displayName,
+        joinedAt: new Date().toISOString()
+      }];
+      
+      // Update the game document
+      await updateDoc(gameRef, {
+        players: updatedPlayers,
+        lastUpdated: new Date().toISOString(),
+        spotsLeft: Math.max(0, (gameDoc.spotsLeft || 0) - 1)
+      });
 
       // Update request status
-      const requestRef = doc(db, 'gameRequests', request.id);
+      const requestRef = doc(db, 'joinRequests', request.id);
       await updateDoc(requestRef, {
         status: 'approved',
         lastUpdated: new Date().toISOString()
       });
 
       loadRequests();
+      showNotification(`Game request from ${validatedData.displayName} approved successfully`);
     } catch (error) {
       console.error('Error approving game request:', error);
+      showNotification(`Failed to approve game request: ${error.message}`, 'error');
     }
   };
 
   const handleReject = async (requestId) => {
     try {
-      const requestRef = doc(db, 'gameRequests', requestId);
+      const requestRef = doc(db, 'joinRequests', requestId);
+      const request = requests.find(r => r.id === requestId);
+      
+      if (!request) {
+        throw new Error('Request not found');
+      }
+      
       await updateDoc(requestRef, {
         status: 'rejected',
         lastUpdated: new Date().toISOString()
       });
+      
       loadRequests();
+      showNotification(`Game request from ${request.displayName} rejected`);
     } catch (error) {
       console.error('Error rejecting game request:', error);
+      showNotification(`Failed to reject game request: ${error.message}`, 'error');
     }
   };
 
   const handleDelete = async (requestId) => {
     if (window.confirm('Are you sure you want to delete this request?')) {
       try {
-        await deleteDoc(doc(db, 'gameRequests', requestId));
+        const request = requests.find(r => r.id === requestId);
+        
+        if (!request) {
+          throw new Error('Request not found');
+        }
+        
+        await deleteDoc(doc(db, 'joinRequests', requestId));
         loadRequests();
+        showNotification(`Game request from ${request.displayName} deleted successfully`);
       } catch (error) {
         console.error('Error deleting game request:', error);
+        showNotification(`Failed to delete game request: ${error.message}`, 'error');
       }
     }
   };
 
   return (
-    <div>
+    <div className="relative">
+      {/* Notification component */}
+      {notification.show && (
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg transition-all duration-300 ${
+          notification.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+        }`}>
+          <div className="flex items-center">
+            <span className="mr-2">
+              {notification.type === 'error' ? '❌' : '✅'}
+            </span>
+            <p>{notification.message}</p>
+            <button 
+              onClick={() => setNotification({ show: false, message: '', type: '' })}
+              className="ml-4 text-white hover:text-gray-300"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <h2 className="text-xl font-bold mb-6">Game Requests</h2>
       
       {requests.length === 0 ? (
@@ -89,8 +169,8 @@ const GameRequests = () => {
           <table className="min-w-full bg-gray-800">
             <thead>
               <tr className="border-b border-gray-700">
-                <th className="px-4 py-2">From Player</th>
-                <th className="px-4 py-2">To Player</th>
+                <th className="px-4 py-2">Player</th>
+                <th className="px-4 py-2">Game</th>
                 <th className="px-4 py-2">Request Date</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Actions</th>
@@ -101,11 +181,11 @@ const GameRequests = () => {
                 <tr key={request.id} className="border-b border-gray-700">
                   <td className="px-4 py-2">
                     <div>
-                      <div>{request.fromPlayerName}</div>
-                      <div className="text-sm text-gray-400">{request.fromPlayerId}</div>
+                      <div>{request.displayName}</div>
+                      <div className="text-sm text-gray-400">{request.userId}</div>
                     </div>
                   </td>
-                  <td className="px-4 py-2">{request.toPlayerName}</td>
+                  <td className="px-4 py-2">{request.gameName}</td>
                   <td className="px-4 py-2">
                     {new Date(request.createdAt).toLocaleDateString()}
                   </td>
