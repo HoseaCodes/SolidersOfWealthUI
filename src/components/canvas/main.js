@@ -1,4 +1,7 @@
 class Game {
-  constructor()
-
+  constructor(canvas, context)
+    this.canvas = canvas;
+    this.context = context;
+    this.width = canvas.width;
+    this.height = canvas.height:
 }
