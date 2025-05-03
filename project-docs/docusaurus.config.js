@@ -18,12 +18,12 @@ const config = {
   url: 'https://hoseacodes.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/SolidersOfWealth/',
+  baseUrl: '/SolidersOfWealthUI/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'HoseaCodes', // Usually your GitHub org/user name.
-  projectName: 'SolidersOfWealth', // Usually your repo name.
+  projectName: 'SolidersOfWealthUI', // Usually your repo name.
   trailingSlash: false,
 
   onBrokenLinks: 'throw',
