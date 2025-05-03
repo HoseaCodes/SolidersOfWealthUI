@@ -3,12 +3,12 @@ name: Deploy Docusaurus Documentation
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'project-docs/**'
   pull_request:
     branches:
-      - main
+      - master
     paths:
       - 'project-docs/**'
   workflow_dispatch:
