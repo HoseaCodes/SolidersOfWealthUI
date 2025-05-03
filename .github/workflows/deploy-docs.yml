@@ -38,8 +38,10 @@ jobs:
           cache: npm
           cache-dependency-path: project-docs/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules
+          npm ci --legacy-peer-deps
 
       - name: Build website
         run: npm run build
