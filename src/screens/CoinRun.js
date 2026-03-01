@@ -1,8 +1,59 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import GameEmbed from "../components/game/GameEmbed";
+import { db } from "../firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 // ─── STYLES ────────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
+      @media (max-width: 768px) {
+        body, html {
+          overflow-x: hidden !important;
+          max-width: 100vw !important;
+        }
+        .sow-play-demo, .sow-hero, .sow-gameplay, .sow-hud-section, .sow-share-section, .sow-footer, section, .sow-mechanics-grid, .sow-event-cards, .sow-counter-demo, .sow-vote-grid {
+          max-width: 100vw !important;
+          width: 100vw !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          box-sizing: border-box !important;
+        }
+        [style*="maxWidth: 1200px"], [style*="maxWidth: 1400px"], [style*="maxWidth: 800px"], [style*="maxWidth: 700px"] {
+          max-width: 100vw !important;
+        }
+        [style*="padding: 80px 40px"], [style*="padding: 60px 40px"], [style*="padding: 120px 40px"] {
+          padding-left: 4vw !important;
+          padding-right: 4vw !important;
+        }
+      }
+    /* Mobile optimization for core loop section */
+    @media (max-width: 480px) {
+      .sow-loop-flow {
+        flex-direction: column !important;
+        gap: 0 !important;
+        margin: 32px 0 !important;
+        padding-bottom: 0 !important;
+      }
+      .sow-loop-step {
+        min-width: 0 !important;
+        padding: 14px 6px !important;
+        font-size: 14px !important;
+        margin-bottom: 8px !important;
+      }
+      .sow-loop-step > div:first-child {
+        font-size: 24px !important;
+        margin-bottom: 4px !important;
+      }
+      .sow-loop-step > div:nth-child(2) {
+        font-size: 15px !important;
+      }
+      .sow-loop-step > div:nth-child(3) {
+        font-size: 12px !important;
+      }
+      .sow-loop-step span[style*="position: absolute"] {
+        font-size: 16px !important;
+        right: -10px !important;
+      }
+    }
   @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&family=Share+Tech+Mono&display=swap');
 
   :root {
@@ -113,6 +164,30 @@ const GLOBAL_CSS = `
     .sow-hero { padding: 100px 20px 60px !important; }
     .sow-gameplay, .sow-hud-section, .sow-share-section { padding: 60px 20px !important; }
   }
+
+  @media (max-width: 480px) {
+    .sow-hero { padding: 60px 8px 32px !important; }
+    .sow-gameplay, .sow-hud-section, .sow-share-section, .sow-play-demo { padding: 32px 4vw !important; }
+    .sow-footer-link, .sow-btn-primary, .sow-btn-secondary, .sow-nav-cta, .sow-share-btn, .sow-signup-input {
+      font-size: 15px !important;
+      padding: 14px 0 !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+    }
+    .sow-mechanic-card, .sow-vote-option { padding: 18px 8px !important; }
+    .sow-event-cards > div { padding: 18px 8px !important; }
+    .sow-hud-section, .sow-share-section { padding: 24px 4vw !important; }
+    .sow-footer-link { font-size: 13px !important; }
+    h1, h2, h3 { font-size: 7vw !important; }
+    .sow-hero-stats { flex-direction: column !important; gap: 12px !important; }
+    .sow-reveal { font-size: 15px !important; }
+    .sow-signup-input { width: 100% !important; }
+    .sow-play-demo { padding: 24px 2vw 16px !important; }
+    .sow-mechanics-grid { gap: 1px !important; }
+    .sow-lb-row, .sow-reveal, .sow-mechanic-card { font-size: 14px !important; }
+    .sow-counter-demo > div { padding: 12px 4px !important; }
+  }
+  }
 `;
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
@@ -197,26 +272,26 @@ function useCountUp(target, triggerRef) {
   return val;
 }
 
-function useCountdown() {
-  const [time, setTime] = useState("00:00:00");
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const next = new Date(now);
-      next.setDate(now.getDate() + ((7 - now.getDay()) % 7 || 7));
-      next.setHours(0, 0, 0, 0);
-      const diff = next - now;
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setTime(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return time;
-}
+// function useCountdown() {
+//   const [time, setTime] = useState("00:00:00");
+//   useEffect(() => {
+//     const tick = () => {
+//       const now = new Date();
+//       const next = new Date(now);
+//       next.setDate(now.getDate() + ((7 - now.getDay()) % 7 || 7));
+//       next.setHours(0, 0, 0, 0);
+//       const diff = next - now;
+//       const h = Math.floor(diff / 3600000);
+//       const m = Math.floor((diff % 3600000) / 60000);
+//       const s = Math.floor((diff % 60000) / 1000);
+//       setTime(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+//     };
+//     tick();
+//     const id = setInterval(tick, 1000);
+//     return () => clearInterval(id);
+//   }, []);
+//   return time;
+// }
 
 function useLiveHUD() {
   const [hud, setHud] = useState({ cash: 18200, assets: 9500, debt: 3400, event: "BOOM", eventColor: "#38A169" });
@@ -244,8 +319,35 @@ function useLiveHUD() {
   return { ...hud, nw };
 }
 
-// ─── SUB-COMPONENTS ────────────────────────────────────────────────────────
-
+function useCountdown() {
+  const [time, setTime] = useState(() => {
+    // Next Sunday at 8pm UTC
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCDate(now.getUTCDate() + ((7 - now.getUTCDay()) % 7 || 7));
+    next.setUTCHours(20, 0, 0, 0);
+    return next - now;
+  });
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(() => {
+        const now = new Date();
+        const next = new Date(now);
+        next.setUTCDate(now.getUTCDate() + ((7 - now.getUTCDay()) % 7 || 7));
+        next.setUTCHours(20, 0, 0, 0);
+        return next - now;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+  // Format as D days HH:MM:SS
+  const totalSeconds = Math.max(0, Math.floor(time / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
 function Nav({ scrolled }) {
   return (
     <nav style={{
@@ -271,7 +373,7 @@ function Nav({ scrolled }) {
           );
         })}
       </ul>
-      <a href="#play" className="sow-nav-cta" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", background: "var(--gold)", color: "var(--dark)", border: "none", padding: "8px 20px", cursor: "pointer", fontWeight: 700, textDecoration: "none", transition: "background 0.2s, transform 0.15s" }}>
+      <a href="#play-demo" className="sow-nav-cta" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", background: "var(--gold)", color: "var(--dark)", border: "none", padding: "8px 20px", cursor: "pointer", fontWeight: 700, textDecoration: "none", transition: "background 0.2s, transform 0.15s" }}>
         Play Now
       </a>
     </nav>
@@ -281,8 +383,8 @@ function Nav({ scrolled }) {
 function Ticker() {
   const items = [...TICKER_ITEMS, ...TICKER_ITEMS];
   return (
-    <div style={{ position: "absolute", top: 80, left: 0, right: 0, overflow: "hidden", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", background: "rgba(240,180,41,0.03)", padding: "8px 0" }}>
-      <div style={{ display: "flex", gap: 60, whiteSpace: "nowrap", animation: "ticker 30s linear infinite" }}>
+    <div className="sow-ticker" style={{ position: "absolute", top: 80, left: 0, right: 0, overflow: "hidden", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", background: "rgba(240,180,41,0.03)", padding: "8px 0" }}>
+      <div className="sow-ticker-inner" style={{ display: "flex", gap: 60, whiteSpace: "nowrap", animation: "ticker 30s linear infinite" }}>
         {items.map((item, i) => (
           <span key={i} style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: 2, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: "var(--gold)" }}>{item.sym}</span>
@@ -330,7 +432,7 @@ function Hero() {
         An endless runner where your survival is measured in net worth. Collect assets, dodge debt, and navigate market crashes to build your financial empire.
       </p>
       <div style={{ marginTop: 48, display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", animation: "fadeUp 0.8s 0.5s ease both" }}>
-        <a href="https://solider-of-wealth.web.app/" target="_blank" rel="noreferrer" className="sow-btn-primary" style={{ fontFamily: "'Black Ops One', cursive", fontSize: 16, letterSpacing: 3, background: "var(--gold)", color: "var(--dark)", border: "none", padding: "16px 40px", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 10, transition: "all 0.2s", clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))" }}>
+        <a href="#play-demo" rel="noreferrer" className="sow-btn-primary" style={{ fontFamily: "'Black Ops One', cursive", fontSize: 16, letterSpacing: 3, background: "var(--gold)", color: "var(--dark)", border: "none", padding: "16px 40px", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 10, transition: "all 0.2s", clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))" }}>
           ▶ Play Now
         </a>
         <a href="#community" className="sow-btn-secondary" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", padding: "16px 32px", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 10, transition: "all 0.2s" }}>
@@ -360,51 +462,51 @@ function SectionDivider({ label }) {
   );
 }
 
-function GamePreview({ hud }) {
-  const nw = hud.cash + hud.assets - hud.debt;
-  return (
-    <div style={{ maxWidth: 900, margin: "60px auto 0", position: "relative" }}>
-      <div style={{ background: "#0A0E14", border: "2px solid var(--border)", aspectRatio: "16/9", position: "relative", overflow: "hidden", clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))" }}>
-        {/* Grid bg */}
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(240,180,41,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(240,180,41,0.03) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-        {/* Ground */}
-        <div style={{ position: "absolute", bottom: "20%", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #8B6914, #F0B429, #8B6914, transparent)", opacity: 0.4 }} />
-        {/* Player */}
-        <div style={{ position: "absolute", bottom: "calc(20% + 2px)", left: "15%", width: 32, height: 48, animation: "playerBob 0.4s ease-in-out infinite alternate" }}>
-          <div style={{ width: "100%", height: "100%", background: "var(--gold)", clipPath: "polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⚔</div>
-        </div>
-        {/* Coins */}
-        <div style={{ position: "absolute", bottom: "32%", left: "35%", fontSize: 20, animation: "floatCoin 2s ease-in-out infinite" }}>🪙</div>
-        <div style={{ position: "absolute", bottom: "40%", left: "55%", fontSize: 16, animation: "floatCoin 2s ease-in-out infinite 0.5s" }}>📈</div>
-        <div style={{ position: "absolute", bottom: "34%", left: "72%", fontSize: 20, animation: "floatCoin 2s ease-in-out infinite 1s" }}>🪙</div>
-        {/* Obstacles */}
-        <div style={{ position: "absolute", bottom: "calc(20% + 2px)", right: "20%", fontSize: 28, animation: "obsMove 3s linear infinite" }}>📄</div>
-        <div style={{ position: "absolute", bottom: "calc(20% + 2px)", right: "50%", fontSize: 28, animation: "obsMove 4.5s linear infinite 1.5s" }}>💸</div>
-        {/* Gate */}
-        <div style={{ position: "absolute", bottom: "20%", right: "30%", display: "flex", gap: 16 }}>
-          {[{ label: "BOOM", color: "var(--green)", bg: "rgba(56,161,105,0.2)" }, { label: "CRASH", color: "var(--red)", bg: "rgba(229,62,62,0.2)" }].map((g) => (
-            <div key={g.label} style={{ width: 48, height: 80, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Black Ops One', cursive", fontSize: 11, letterSpacing: 1, background: g.bg, border: `2px solid ${g.color}`, color: g.color, animation: "gatePulse 2s ease-in-out infinite" }}>
-              {g.label}
-            </div>
-          ))}
-        </div>
-        {/* HUD overlay */}
-        <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between" }}>
-          {[
-            { label: "Net Worth", val: `$${nw.toLocaleString()}`, color: "var(--gold)" },
-            { label: "Market", val: hud.event, color: hud.eventColor },
-            { label: "Health", val: "❤❤❤", color: "var(--red)" },
-          ].map((item) => (
-            <div key={item.label} style={{ background: "rgba(10,10,8,0.8)", border: "1px solid var(--border)", padding: "6px 14px" }}>
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: 3, color: "var(--muted)", textTransform: "uppercase" }}>{item.label}</div>
-              <div style={{ fontFamily: "'Black Ops One', cursive", fontSize: 16, color: item.color }}>{item.val}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// function GamePreview({ hud }) {
+//   const nw = hud.cash + hud.assets - hud.debt;
+//   return (
+//     <div style={{ maxWidth: 900, margin: "60px auto 0", position: "relative" }}>
+//       <div style={{ background: "#0A0E14", border: "2px solid var(--border)", aspectRatio: "16/9", position: "relative", overflow: "hidden", clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))" }}>
+//         {/* Grid bg */}
+//         <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(240,180,41,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(240,180,41,0.03) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+//         {/* Ground */}
+//         <div style={{ position: "absolute", bottom: "20%", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #8B6914, #F0B429, #8B6914, transparent)", opacity: 0.4 }} />
+//         {/* Player */}
+//         <div style={{ position: "absolute", bottom: "calc(20% + 2px)", left: "15%", width: 32, height: 48, animation: "playerBob 0.4s ease-in-out infinite alternate" }}>
+//           <div style={{ width: "100%", height: "100%", background: "var(--gold)", clipPath: "polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⚔</div>
+//         </div>
+//         {/* Coins */}
+//         <div style={{ position: "absolute", bottom: "32%", left: "35%", fontSize: 20, animation: "floatCoin 2s ease-in-out infinite" }}>🪙</div>
+//         <div style={{ position: "absolute", bottom: "40%", left: "55%", fontSize: 16, animation: "floatCoin 2s ease-in-out infinite 0.5s" }}>📈</div>
+//         <div style={{ position: "absolute", bottom: "34%", left: "72%", fontSize: 20, animation: "floatCoin 2s ease-in-out infinite 1s" }}>🪙</div>
+//         {/* Obstacles */}
+//         <div style={{ position: "absolute", bottom: "calc(20% + 2px)", right: "20%", fontSize: 28, animation: "obsMove 3s linear infinite" }}>📄</div>
+//         <div style={{ position: "absolute", bottom: "calc(20% + 2px)", right: "50%", fontSize: 28, animation: "obsMove 4.5s linear infinite 1.5s" }}>💸</div>
+//         {/* Gate */}
+//         <div style={{ position: "absolute", bottom: "20%", right: "30%", display: "flex", gap: 16 }}>
+//           {[{ label: "BOOM", color: "var(--green)", bg: "rgba(56,161,105,0.2)" }, { label: "CRASH", color: "var(--red)", bg: "rgba(229,62,62,0.2)" }].map((g) => (
+//             <div key={g.label} style={{ width: 48, height: 80, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Black Ops One', cursive", fontSize: 11, letterSpacing: 1, background: g.bg, border: `2px solid ${g.color}`, color: g.color, animation: "gatePulse 2s ease-in-out infinite" }}>
+//               {g.label}
+//             </div>
+//           ))}
+//         </div>
+//         {/* HUD overlay */}
+//         <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between" }}>
+//           {[
+//             { label: "Net Worth", val: `$${nw.toLocaleString()}`, color: "var(--gold)" },
+//             { label: "Market", val: hud.event, color: hud.eventColor },
+//             { label: "Health", val: "❤❤❤", color: "var(--red)" },
+//           ].map((item) => (
+//             <div key={item.label} style={{ background: "rgba(10,10,8,0.8)", border: "1px solid var(--border)", padding: "6px 14px" }}>
+//               <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: 3, color: "var(--muted)", textTransform: "uppercase" }}>{item.label}</div>
+//               <div style={{ fontFamily: "'Black Ops One', cursive", fontSize: 16, color: item.color }}>{item.val}</div>
+//             </div>
+//           ))}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
 
 function LoopFlow() {
   return (
@@ -488,7 +590,7 @@ function MarketEvents() {
 }
 
 function HUDSection({ hud }) {
-  const nw = hud.cash + hud.assets - hud.debt;
+  // const nw = hud.cash + hud.assets - hud.debt;
   return (
     <section id="score" className="sow-hud-section" style={{ padding: "80px 40px", maxWidth: 1200, margin: "0 auto" }}>
       <div className="sow-reveal" style={{ marginBottom: 60 }}>
@@ -582,11 +684,35 @@ function Leaderboard({ countdown }) {
 function VoteWidget() {
   const [votes, setVotes] = useState([62, 38]);
   const [voted, setVoted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem("sow_email") || "");
+  const [emailTouched, setEmailTouched] = useState(false);
 
-  const castVote = (idx) => {
-    if (voted) return;
-    setVoted(true);
-    setVotes(idx === 0 ? [67, 33] : [33, 67]);
+  const validateEmail = (email) => /.+@.+\..+/.test(email);
+
+  const castVote = async (idx) => {
+    if (voted || loading) return;
+    setEmailTouched(true);
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address before voting.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await addDoc(collection(db, "votes"), {
+        option: idx,
+        email: email.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setVoted(true);
+      setVotes(idx === 0 ? [votes[0] + 1, votes[1]] : [votes[0], votes[1] + 1]);
+    } catch (e) {
+      setError("Failed to submit vote. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const options = [
@@ -594,6 +720,7 @@ function VoteWidget() {
     { title: "ASSET SEIZURE", desc: "Debt doubles in effect for 10 seconds. High-asset players feel the pinch hardest." },
   ];
 
+  // If email is present, hide the input and show the email
   return (
     <section id="community" style={{ padding: "80px 40px", background: "var(--dark2)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
       <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
@@ -602,10 +729,42 @@ function VoteWidget() {
           <h2 style={{ fontFamily: "'Black Ops One', cursive", fontSize: "clamp(32px, 5vw, 64px)", lineHeight: 1, textTransform: "uppercase" }}>Vote on the Next Event</h2>
           <p style={{ color: "var(--muted)", fontSize: 16, letterSpacing: 1, marginTop: 16 }}>Your vote shapes the game. The winning event gets added and you get credited as designer.</p>
         </div>
-        <div className="sow-vote-grid sow-reveal" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, background: "var(--border)", marginTop: 48, textAlign: "left" }}>
+        {!email ? (
+          <div style={{ margin: "32px 0 24px", display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              onBlur={() => setEmailTouched(true)}
+              placeholder="your@email.com"
+              disabled={voted || loading}
+              style={{
+                padding: "12px 18px",
+                fontSize: 15,
+                fontFamily: "'Share Tech Mono', monospace",
+                border: emailTouched && !validateEmail(email) ? "2px solid var(--red)" : "1px solid var(--border)",
+                borderRadius: 6,
+                outline: "none",
+                width: 260,
+                background: "var(--dark3)",
+                color: "var(--text)",
+                transition: "border-color 0.2s"
+              }}
+            />
+            <span style={{ fontSize: 13, color: emailTouched && !validateEmail(email) ? "var(--red)" : "var(--muted)", fontFamily: "'Share Tech Mono', monospace" }}>
+              {emailTouched && !validateEmail(email) ? "Enter a valid email" : "Required to vote"}
+            </span>
+          </div>
+        ) : (
+          <div style={{ margin: "32px 0 24px", color: "var(--muted)", fontFamily: "'Share Tech Mono', monospace", fontSize: 15 }}>
+            Voting as <span style={{ color: "var(--gold)" }}>{email}</span>
+          </div>
+        )}
+        {error && <div style={{ color: "var(--red)", margin: "16px 0" }}>{error}</div>}
+        <div className="sow-vote-grid sow-reveal" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, background: "var(--border)", marginTop: 24, textAlign: "left" }}>
           {options.map((opt, i) => (
             <div key={opt.title} className="sow-vote-option" onClick={() => castVote(i)}
-              style={{ background: voted && votes[i] > 50 ? "linear-gradient(135deg, var(--dark3), rgba(240,180,41,0.06))" : "var(--dark3)", padding: "28px 32px", cursor: voted ? "default" : "pointer", transition: "background 0.15s", borderTop: voted && votes[i] > 50 ? "2px solid var(--gold)" : "2px solid transparent" }}>
+              style={{ background: voted && votes[i] > votes[1 - i] ? "linear-gradient(135deg, var(--dark3), rgba(240,180,41,0.06))" : "var(--dark3)", padding: "28px 32px", cursor: voted ? "default" : loading ? "wait" : "pointer", transition: "background 0.15s", borderTop: voted && votes[i] > votes[1 - i] ? "2px solid var(--gold)" : "2px solid transparent" }}>
               <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: 4, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase" }}>Community Submission</div>
               <div style={{ fontFamily: "'Black Ops One', cursive", fontSize: 20, letterSpacing: 2, color: "var(--text)", marginBottom: 12 }}>{opt.title}</div>
               <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>{opt.desc}</div>
@@ -652,15 +811,29 @@ function ShareCard() {
 }
 
 function FounderCTA() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem("sow_email") || "");
   const [msg, setMsg] = useState("Join Discord · Get Early Access · Earn Pioneer Tag");
   const [msgColor, setMsgColor] = useState("var(--muted)");
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (email && email.includes("@")) {
-      setMsg("✓ You're enlisted, Commander. Welcome to the War Room.");
-      setMsgColor("var(--green)");
-      setEmail("");
+      setLoading(true);
+      try {
+        localStorage.setItem("sow_email", email.trim());
+        // Save to Firestore 'signups' collection
+        await addDoc(collection(db, "signups"), {
+          email: email.trim(),
+          timestamp: serverTimestamp(),
+        });
+        setMsg("✓ You're enlisted, Commander. Welcome to the War Room.");
+        setMsgColor("var(--green)");
+      } catch (e) {
+        setMsg("⚠ Failed to save. Please try again.");
+        setMsgColor("var(--red)");
+      } finally {
+        setLoading(false);
+      }
     } else {
       setMsg("⚠ Enter a valid email to join the War Room.");
       setMsgColor("var(--red)");
@@ -691,10 +864,11 @@ function FounderCTA() {
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSignup()}
           placeholder="commander@email.com"
+          disabled={loading}
           style={{ flex: 1, background: "var(--dark3)", border: "1px solid var(--border)", borderRight: "none", padding: "14px 20px", fontFamily: "'Share Tech Mono', monospace", fontSize: 12, letterSpacing: 2, color: "var(--text)", outline: "none", transition: "border-color 0.2s" }}
         />
-        <button onClick={handleSignup} style={{ fontFamily: "'Black Ops One', cursive", fontSize: 13, letterSpacing: 2, background: "var(--gold)", color: "var(--dark)", border: "none", padding: "14px 28px", cursor: "pointer", transition: "background 0.2s" }}>
-          ENLIST
+        <button onClick={handleSignup} disabled={loading} style={{ fontFamily: "'Black Ops One', cursive", fontSize: 13, letterSpacing: 2, background: "var(--gold)", color: "var(--dark)", border: "none", padding: "14px 28px", cursor: loading ? "wait" : "pointer", transition: "background 0.2s" }}>
+          {loading ? "ENLISTING..." : "ENLIST"}
         </button>
       </div>
       <p className="sow-reveal" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: 2, color: msgColor, marginTop: 16, textTransform: "uppercase", transition: "color 0.3s" }}>
@@ -706,9 +880,9 @@ function FounderCTA() {
 
 function Footer() {
   const links = [
-    { title: "Play", items: [{ label: "Play Now", href: "https://solider-of-wealth.web.app/" }, { label: "Leaderboard", href: "#leaderboard" }, { label: "Market Events", href: "#events" }] },
+    { title: "Play", items: [{ label: "Play Now", href: "#play-demo-demo" }, { label: "Leaderboard", href: "#leaderboard" }, { label: "Market Events", href: "#events" }] },
     { title: "Community", items: [{ label: "Join Discord", href: "#" }, { label: "Vote on Features", href: "#community" }, { label: "Submit Event Ideas", href: "#community" }] },
-    { title: "Studio", items: [{ label: "Asperia Games", href: "https://asperiagames.com/" }, { label: "Ambitious Concepts LLC", href: "#" }] },
+    { title: "Studio", items: [{ label: "Asperia Games", href: "https://asperiagames.com/" }, { label: "Ambitious Concepts LLC", href: "https://ambitiousconcept.com/" }] },
   ];
   return (
     <footer style={{ padding: "60px 40px 40px", borderTop: "1px solid var(--border)" }}>
@@ -768,10 +942,38 @@ export default function CoinRun() {
   // Scroll reveal observer
   useScrollReveal();
 
+  // Responsive: hide demo on mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--dark)", color: "var(--text)" }}>
       <Nav scrolled={scrolled} />
       <Hero />
+      {/* Play Demo section at the top, as in most modern web games */}
+      <section id="play-demo" className="sow-play-demo" style={{ padding: "80px 40px 40px", maxWidth: 1200, margin: "0 auto", width: "100%" }}>
+        <div className="sow-reveal" style={{ marginBottom: 24, textAlign: "center" }}>
+          <h2 style={{ fontFamily: "'Black Ops One', cursive", fontSize: "clamp(28px, 8vw, 60px)", color: "var(--gold)", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Play the Demo!</h2>
+          <p style={{ color: "var(--muted)", fontSize: 16, marginBottom: 18 }}>Jump in and experience Soldiers of Wealth right here in your browser.</p>
+        </div>
+        {isMobile ? (
+          <div className="sow-reveal" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 18, padding: '32px 0' }}>
+            <strong>Demo not available on mobile.<br />Please use a desktop browser to play.</strong>
+          </div>
+        ) : (
+          <div className="sow-reveal" style={{ width: "100%", maxWidth: "100vw", overflowX: "auto" }}>
+            <div style={{ width: "100%", maxWidth: 700, margin: "0 auto" }}>
+              <GameEmbed hud={hud} />
+            </div>
+          </div>
+        )}
+      </section>
+
       <SectionDivider label="Game Mechanics" />
       <section id="gameplay" className="sow-gameplay" style={{ padding: "80px 40px", maxWidth: 1200, margin: "0 auto" }}>
         <div className="sow-reveal" style={{ marginBottom: 60 }}>
@@ -779,7 +981,6 @@ export default function CoinRun() {
           <h2 style={{ fontFamily: "'Black Ops One', cursive", fontSize: "clamp(32px, 5vw, 64px)", lineHeight: 1, textTransform: "uppercase" }}>The Core Loop</h2>
         </div>
         {/* <div className="sow-reveal"><GamePreview hud={hud} /></div> */}
-        <div className="sow-reveal"><GameEmbed hud={hud} /></div>
         <div className="sow-reveal"><LoopFlow /></div>
         <div className="sow-reveal"><MechanicsGrid /></div>
       </section>
