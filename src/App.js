@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { EconomicProvider } from './components/admin/contexts/EconomicContext';
+import { EconomicProvider } from './contexts/EconomicContext';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import GameRoute from './components/auth/GameRoute';
@@ -15,14 +15,17 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import Profile from './components/profile/Profile';
 import TrainingLibrary from './components/training/TrainingLibrary';
 import TrainingAdmin from './components/training/TrainingAdmin';
+import CoinRun from './screens/CoinRun';
 
 function App() {
   return (
-      <AuthProvider>
-        <EconomicProvider>
+    <Router>
+      <EconomicProvider>
+        <AuthProvider>
           <div className="App min-h-screen bg-gray-900 text-white">
             <Routes>
-              <Route path="/" element={<LandingPage />} />
+              {/* <Route path="/" element={<LandingPage />} /> */}
+              <Route path="/" element={<CoinRun />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/dashboard" element={
@@ -65,8 +68,9 @@ function App() {
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </div>
-        </EconomicProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </EconomicProvider>
+    </Router>
   );
 }
 

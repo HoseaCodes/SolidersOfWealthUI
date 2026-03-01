@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import Modal from '../common/Modal';
+import GameEmbed from '../game/GameEmbed';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -74,6 +75,10 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div>
+        <GameEmbed />
       </div>
 
       {/* Game Features */}
